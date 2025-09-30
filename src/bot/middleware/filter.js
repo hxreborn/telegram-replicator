@@ -1,4 +1,4 @@
-import { logger } from '../../config.js';
+import { logger } from '../../config.js'
 
 /**
  * Pure message filtering and transformation logic.
@@ -18,44 +18,44 @@ import { logger } from '../../config.js';
  */
 export function filterMessage(msg, config) {
   // Extract visible text from message or caption
-  const text = extractText(msg);
+  const text = extractText(msg)
   if (!text) {
-    logger.debug({ msgId: msg.id }, 'Drop: no text content');
-    return null;
+    logger.debug({ msgId: msg.id }, 'Drop: no text content')
+    return null
   }
 
   // Apply filter regex (already compiled in config)
   if (!config.filterRegex.test(text)) {
-    logger.debug({ msgId: msg.id }, 'Drop: filter regex mismatch');
-    return null;
+    logger.debug({ msgId: msg.id }, 'Drop: filter regex mismatch')
+    return null
   }
 
   // Strip footer patterns (already compiled in config)
-  const cleaned = text.replace(config.stripRegex, '').trim();
+  const cleaned = text.replace(config.stripRegex, '').trim()
   if (!cleaned) {
-    logger.debug({ msgId: msg.id }, 'Drop: empty after strip');
-    return null;
+    logger.debug({ msgId: msg.id }, 'Drop: empty after strip')
+    return null
   }
 
   // HTML escape
-  const safe = escapeHtml(cleaned);
+  const safe = escapeHtml(cleaned)
 
   // Determine media type if present
-  let mediaType = null;
+  let mediaType = null
   if (msg.media) {
     if (msg.media._ === 'messageMediaPhoto') {
-      mediaType = 'photo';
+      mediaType = 'photo'
     } else if (msg.media._ === 'messageMediaDocument') {
       // Check size limit for documents
-      const size = msg.media.document?.size;
+      const size = msg.media.document?.size
       if (size && BigInt(size) > BigInt(config.maxMediaBytes)) {
-        logger.debug({ msgId: msg.id, size }, 'Drop: media exceeds size limit');
-        return null;
+        logger.debug({ msgId: msg.id, size }, 'Drop: media exceeds size limit')
+        return null
       }
-      mediaType = 'document';
+      mediaType = 'document'
     } else {
-      logger.debug({ msgId: msg.id, type: msg.media._ }, 'Drop: unsupported media type');
-      return null;
+      logger.debug({ msgId: msg.id, type: msg.media._ }, 'Drop: unsupported media type')
+      return null
     }
   }
 
@@ -63,21 +63,18 @@ export function filterMessage(msg, config) {
     text: safe,
     mediaType,
     sourceId: msg.id
-  };
+  }
 }
 
 // Extract visible text from message body or caption
 function extractText(msg) {
-  const body = typeof msg?.message === 'string' ? msg.message : undefined;
-  const caption = typeof msg?.caption === 'string' ? msg.caption : undefined;
-  const text = (body || caption)?.trim();
-  return text && text.length > 0 ? text : null;
+  const body = typeof msg?.message === 'string' ? msg.message : undefined
+  const caption = typeof msg?.caption === 'string' ? msg.caption : undefined
+  const text = (body || caption)?.trim()
+  return text && text.length > 0 ? text : null
 }
 
 // Escape HTML special characters for Telegram's HTML parse mode
 function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

@@ -1,12 +1,12 @@
-import { EventEmitter } from 'node:events';
-import fs from 'node:fs';
-import path from 'node:path';
-import { TelegramClient } from 'telegram';
-import { StringSession } from 'telegram/sessions/index.js';
-import { NewMessage } from 'telegram/events/index.js';
-import { logger } from '../config.js';
+import { EventEmitter } from 'node:events'
+import fs from 'node:fs'
+import path from 'node:path'
+import { TelegramClient } from 'telegram'
+import { StringSession } from 'telegram/sessions/index.js'
+import { NewMessage } from 'telegram/events/index.js'
+import { logger } from '../config.js'
 
-const SESSION_FILE = '.telegram-session';
+const SESSION_FILE = '.telegram-session'
 
 /**
  * Creates a GramJS listener that emits 'message' events for messages from the source channel.
@@ -17,91 +17,106 @@ const SESSION_FILE = '.telegram-session';
  * @param {string} options.apiHash Telegram API hash
  * @param {string} options.phone Phone number for authentication
  * @param {string} options.source Source channel username or ID
+ * @param {string} [options.twoFactorPassword] Optional 2FA password
  * @returns {Promise<EventEmitter & { stop: Function, downloadMedia: Function }>}
  */
-export async function createListener({ apiId, apiHash, phone, source }) {
-  const emitter = new EventEmitter();
+export async function createListener({ apiId, apiHash, phone, source, twoFactorPassword = '' }) {
+  const emitter = new EventEmitter()
 
   // Load existing session or create empty
-  const sessionPath = path.resolve(SESSION_FILE);
-  const session = fs.existsSync(sessionPath)
-    ? fs.readFileSync(sessionPath, 'utf8')
-    : '';
+  const sessionPath = path.resolve(SESSION_FILE)
+  const session = fs.existsSync(sessionPath) ? fs.readFileSync(sessionPath, 'utf8') : ''
 
   // Initialize Telegram client
-  const client = new TelegramClient(
-    new StringSession(session),
-    apiId,
-    apiHash,
-    { connectionRetries: 5 }
-  );
+  const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
+    connectionRetries: 5
+  })
 
   // Authentication flow
   if (!session) {
-    logger.info('No session found, starting authentication');
+    logger.info('No session found, starting authentication')
     await client.start({
       phoneNumber: phone,
-      password: async () => '', // No 2FA password by default
-      phoneCode: async () => new Promise(resolve => {
-        process.stdout.write('Enter SMS code: ');
-        process.stdin.once('data', data => resolve(data.toString().trim()));
-      }),
+      password: async () => {
+        if (twoFactorPassword) {
+          return twoFactorPassword
+        }
+
+        const envPassword = process.env.TG_2FA_PASSWORD
+        if (envPassword) {
+          return envPassword
+        }
+
+        // Prompt for 2FA if needed
+        return new Promise((resolve) => {
+          process.stdout.write('Enter 2FA password (press Enter to skip): ')
+          process.stdin.once('data', (data) => resolve(data.toString().trim()))
+        })
+      },
+      phoneCode: async () =>
+        new Promise((resolve) => {
+          process.stdout.write('Enter SMS code: ')
+          process.stdin.once('data', (data) => resolve(data.toString().trim()))
+        }),
       onError: (err) => logger.error({ err }, 'Authentication error')
-    });
-    fs.writeFileSync(sessionPath, client.session.save(), { mode: 0o600 });
-    logger.info({ file: SESSION_FILE }, 'Session saved');
-    logger.warn('Session file contains auth token - keep it secure (chmod 600)');
+    })
+    fs.writeFileSync(sessionPath, client.session.save(), { mode: 0o600 })
+    logger.info({ file: SESSION_FILE }, 'Session saved')
+    logger.warn('Session file contains auth token - keep it secure (chmod 600)')
   } else {
-    await client.connect();
-    logger.debug('Session restored from file');
+    await client.connect()
+    logger.debug('Session restored from file')
   }
 
   // Get dialogs to ensure connection is ready
-  await client.getDialogs({ limit: 1 });
+  await client.getDialogs({ limit: 1 })
 
   // Resolve source channel entity
-  let channelId;
+  let channelId
   try {
-    const entity = await client.getEntity(source);
-    channelId = BigInt(entity.id);
-    logger.info({
-      id: entity.id.toString(),
-      username: entity.username,
-      title: entity.title
-    }, 'Source channel resolved');
+    const entity = await client.getEntity(source)
+    channelId = BigInt(entity.id)
+    logger.info(
+      {
+        id: entity.id.toString(),
+        username: entity.username,
+        title: entity.title
+      },
+      'Source channel resolved'
+    )
   } catch (err) {
     const hint = source.startsWith('@')
       ? `Ensure you're a member of ${source}, or use numeric ID (-100...)`
-      : `Ensure the numeric ID is correct and you're a member`;
-    logger.error({ source, err }, 'Failed to resolve source channel');
+      : `Ensure the numeric ID is correct and you're a member`
+    logger.error({ source, err }, 'Failed to resolve source channel')
     throw new Error(
       `Cannot find Telegram channel: ${source}\n` +
-      `  → ${hint}\n` +
-      `  → Original error: ${err.message}`
-    );
+        `  → ${hint}\n` +
+        `  → Original error: ${err.message}`
+    )
   }
 
   // Attach event handler for new messages
-  client.addEventHandler(
-    (event) => {
-      const msg = event.message;
-      if (!msg) return;
+  client.addEventHandler((event) => {
+    const msg = event.message
+    if (!msg) return
 
-      // Check if message is from our source channel
-      const msgChannelId = msg.peerId?.channelId?.toString();
-      if (msgChannelId === channelId.toString()) {
-        logger.debug({
+    // Check if message is from our source channel
+    const msgChannelId = msg.peerId?.channelId?.toString()
+    if (msgChannelId === channelId.toString()) {
+      logger.debug(
+        {
           msgId: msg.id,
           hasMedia: !!msg.media,
           text: (msg.message || msg.caption || '').slice(0, 50)
-        }, 'Message received from source');
-        emitter.emit('message', msg);
-      }
-    },
-    new NewMessage({})
-  );
+        },
+        'Message received from source'
+      )
+      emitter.emit('message', msg)
+    }
+  }, new NewMessage({}))
 
-  logger.info('Listener ready');
+  logger.info('Listener ready')
 
   // Return EventEmitter with additional methods
   return Object.assign(emitter, {
@@ -109,8 +124,8 @@ export async function createListener({ apiId, apiHash, phone, source }) {
      * Disconnects the Telegram client
      */
     stop: async () => {
-      logger.info('Stopping listener');
-      await client.disconnect();
+      logger.info('Stopping listener')
+      await client.disconnect()
     },
 
     /**
@@ -120,22 +135,44 @@ export async function createListener({ apiId, apiHash, phone, source }) {
      * @returns {Promise<Buffer|null>}
      */
     downloadMedia: async (msg, maxBytes) => {
-      if (!msg.media) return null;
+      if (!msg.media) return null
 
       // Check size for documents
-      const size = msg.media.document?.size;
+      const size = msg.media.document?.size
       if (size && BigInt(size) > BigInt(maxBytes)) {
-        logger.debug({ msgId: msg.id, size }, 'Media exceeds size limit');
-        return null;
+        logger.debug({ msgId: msg.id, size }, 'Media exceeds size limit')
+        return null
+      }
+
+      // Approximate size check for photos
+      const photoSizes = msg.media.photo?.sizes ?? []
+      if (photoSizes.length) {
+        const possibleSizes = photoSizes
+          .map((entry) => {
+            if (typeof entry.size === 'number') return entry.size
+            if (typeof entry.size === 'bigint') return Number(entry.size)
+            if (typeof entry.bytes === 'number') return entry.bytes
+            if (typeof entry.bytes === 'bigint') return Number(entry.bytes)
+            return null
+          })
+          .filter((value) => Number.isFinite(value) && value > 0)
+
+        if (possibleSizes.length) {
+          const maxPhotoSize = Math.max(...possibleSizes)
+          if (BigInt(maxPhotoSize) > BigInt(maxBytes)) {
+            logger.debug({ msgId: msg.id, size: maxPhotoSize }, 'Photo exceeds size limit')
+            return null
+          }
+        }
       }
 
       try {
-        const buffer = await client.downloadMedia(msg, {});
-        return Buffer.isBuffer(buffer) ? buffer : null;
+        const buffer = await client.downloadMedia(msg, {})
+        return Buffer.isBuffer(buffer) ? buffer : null
       } catch (err) {
-        logger.error({ msgId: msg.id, err }, 'Media download failed');
-        return null;
+        logger.error({ msgId: msg.id, err }, 'Media download failed')
+        return null
       }
     }
-  });
+  })
 }
