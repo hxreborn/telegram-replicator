@@ -25,7 +25,24 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
 
   // Load existing session or create empty
   const sessionPath = path.resolve(SESSION_FILE)
-  const session = fs.existsSync(sessionPath) ? fs.readFileSync(sessionPath, 'utf8') : ''
+  let session = ''
+  if (fs.existsSync(sessionPath)) {
+    try {
+      const stats = fs.statSync(sessionPath)
+      // Ensure session file has correct permissions (owner read/write only)
+      if (stats.mode & 0o077) {
+        logger.warn(
+          { file: SESSION_FILE, currentMode: stats.mode.toString(8) },
+          'Session file has insecure permissions, fixing to 0600'
+        )
+        fs.chmodSync(sessionPath, 0o600)
+      }
+      session = fs.readFileSync(sessionPath, 'utf8')
+    } catch (err) {
+      logger.error({ err, file: SESSION_FILE }, 'Failed to read session file')
+      throw new Error(`Cannot read session file: ${err.message}`)
+    }
+  }
 
   // Initialize Telegram client
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
@@ -60,7 +77,17 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
         }),
       onError: (err) => logger.error({ err }, 'Authentication error')
     })
-    fs.writeFileSync(sessionPath, client.session.save(), { mode: 0o600 })
+    const sessionData = client.session.save()
+    fs.writeFileSync(sessionPath, sessionData, { mode: 0o600 })
+    // Verify file was written with correct permissions
+    const stats = fs.statSync(sessionPath)
+    if (stats.mode & 0o077) {
+      logger.error(
+        { file: SESSION_FILE, currentMode: stats.mode.toString(8) },
+        'Failed to set secure permissions on session file'
+      )
+      throw new Error('Security check failed: session file permissions are insecure')
+    }
     logger.info({ file: SESSION_FILE }, 'Session saved')
     logger.warn('Session file contains auth token - keep it secure (chmod 600)')
   } else {
@@ -102,8 +129,8 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     if (!msg) return
 
     // Check if message is from our source channel
-    const msgChannelId = msg.peerId?.channelId?.toString()
-    if (msgChannelId === channelId.toString()) {
+    const msgChannelId = msg.peerId?.channelId
+    if (msgChannelId && BigInt(msgChannelId) === channelId) {
       logger.debug(
         {
           msgId: msg.id,
