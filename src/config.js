@@ -54,6 +54,30 @@ function validateMaxMediaBytes(envValue) {
   return parsed
 }
 
+// Parse supported media types
+function getSupportedMediaTypes(envValue) {
+  const defaultTypes = ['photo', 'document']
+
+  if (!envValue) return defaultTypes
+
+  const types = envValue
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length > 0)
+
+  const validTypes = ['photo', 'document', 'video', 'audio']
+  const invalidTypes = types.filter((t) => !validTypes.includes(t))
+
+  if (invalidTypes.length > 0) {
+    throw new Error(
+      `Invalid media types in SUPPORTED_MEDIA_TYPES: "${invalidTypes.join(', ')}"\n` +
+        `  → Valid types: ${validTypes.join(', ')}`
+    )
+  }
+
+  return types.length > 0 ? types : defaultTypes
+}
+
 // Validate and parse target chat IDs
 function parseTargets(targetsStr) {
   const ids = targetsStr
@@ -120,6 +144,7 @@ export const config = Object.freeze({
     'STRIP_REGEX'
   ),
   maxMediaBytes: validateMaxMediaBytes(process.env.MAX_MEDIA_BYTES), // 10 MiB default
+  supportedMediaTypes: getSupportedMediaTypes(process.env.SUPPORTED_MEDIA_TYPES),
   logLevel: process.env.LOG_LEVEL || 'info'
 })
 
