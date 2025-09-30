@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+logs/
+
+# Environment and session files
+.env*
+.telegram-session
+
+# IDE and tooling
+.vscode/
+.idea/
+.claude/
+.mcp/
+
+# Generated files
+*.min.js
+*.bundle.js
+
+# Markdown files (managed manually)
+CLAUDE.md
