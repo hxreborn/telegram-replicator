@@ -3,6 +3,72 @@ import { logger, maskChatId } from '../config.js'
 
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
+const MAX_RETRIES = 4
+const BASE_DELAY_MS = 1000 // 1 second
+
+/**
+ * Retry with exponential backoff and jitter
+ * @private
+ */
+async function retryWithBackoff(initialRetryAfter, chatId, sourceId, sendToTarget) {
+  let attempt = 0
+  let retryAfter = Math.min(initialRetryAfter, 60) // Cap at 60 seconds
+
+  while (attempt < MAX_RETRIES) {
+    attempt++
+
+    // Calculate exponential backoff with jitter
+    const backoffMs = BASE_DELAY_MS * Math.pow(2, attempt - 1)
+    const jitterMs = Math.random() * 1000 // Add up to 1 second of jitter
+    const delayMs = Math.max(retryAfter * 1000, backoffMs) + jitterMs
+
+    logger.warn(
+      {
+        chatId: maskChatId(chatId),
+        attempt,
+        delaySeconds: Math.round(delayMs / 1000),
+        initialRetryAfter
+      },
+      `Rate limited, retry attempt ${attempt}/${MAX_RETRIES} after ${Math.round(delayMs / 1000)}s`
+    )
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+
+    try {
+      await sendToTarget()
+      logger.info(
+        {
+          chatId: maskChatId(chatId),
+          sourceId,
+          attempt,
+          totalDelayMs: Math.round(delayMs / 1000)
+        },
+        `Message sent (after ${attempt} retries)`
+      )
+      return // Success, exit retry loop
+    } catch (retryErr) {
+      // Check if this is still a rate limit error with new retry time
+      const newRetryAfter =
+        retryErr.parameters?.retry_after ?? retryErr.response?.parameters?.retry_after
+
+      if (newRetryAfter && typeof newRetryAfter === 'number' && newRetryAfter > 0) {
+        retryAfter = Math.min(newRetryAfter, 60) // Update with new retry time
+      }
+
+      if (attempt === MAX_RETRIES) {
+        logger.error(
+          {
+            chatId: maskChatId(chatId),
+            sourceId,
+            err: retryErr,
+            totalAttempts: MAX_RETRIES
+          },
+          'Failed after all retry attempts'
+        )
+      }
+    }
+  }
+}
 
 /**
  * Creates a Telegraf bot sender that can send messages and media to multiple targets.
@@ -90,22 +156,7 @@ export async function createSender(token, targets) {
           }
 
           if (retryAfter) {
-            const clamped = Math.min(retryAfter, 60)
-            logger.warn(
-              { chatId: maskChatId(chatId), retryAfter: clamped },
-              `Rate limited, retrying after ${clamped}s`
-            )
-            await new Promise((resolve) => setTimeout(resolve, clamped * 1000))
-
-            try {
-              await sendToTarget()
-              logger.info({ chatId: maskChatId(chatId), sourceId }, 'Message sent (after retry)')
-            } catch (retryErr) {
-              logger.error(
-                { chatId: maskChatId(chatId), sourceId, err: retryErr },
-                'Failed after retry'
-              )
-            }
+            await retryWithBackoff(retryAfter, chatId, sourceId, sendToTarget)
           } else {
             logger.error({ chatId: maskChatId(chatId), sourceId, err }, 'Failed to send message')
           }
@@ -138,6 +189,20 @@ async function sendMedia(bot, chatId, buffer, type, caption) {
       options
     )
     return result.photo?.at(-1)?.file_id
+  } else if (type === 'video') {
+    const result = await bot.telegram.sendVideo(
+      chatId,
+      { source: buffer, filename: 'video.mp4' },
+      options
+    )
+    return result.video?.file_id
+  } else if (type === 'audio') {
+    const result = await bot.telegram.sendAudio(
+      chatId,
+      { source: buffer, filename: 'audio.mp3' },
+      options
+    )
+    return result.audio?.file_id
   } else if (type === 'document') {
     const result = await bot.telegram.sendDocument(
       chatId,
@@ -158,6 +223,10 @@ async function sendCachedMedia(bot, chatId, fileId, type, caption) {
 
   if (type === 'photo') {
     await bot.telegram.sendPhoto(chatId, fileId, options)
+  } else if (type === 'video') {
+    await bot.telegram.sendVideo(chatId, fileId, options)
+  } else if (type === 'audio') {
+    await bot.telegram.sendAudio(chatId, fileId, options)
   } else if (type === 'document') {
     await bot.telegram.sendDocument(chatId, fileId, options)
   }
