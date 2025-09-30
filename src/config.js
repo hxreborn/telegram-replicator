@@ -37,6 +37,23 @@ function compileRegex(pattern, flags, name) {
   }
 }
 
+// Validate MAX_MEDIA_BYTES
+function validateMaxMediaBytes(envValue) {
+  const defaultValue = 10 * 1024 * 1024 // 10 MiB
+
+  if (!envValue) return defaultValue
+
+  const parsed = Number(envValue)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(
+      `Invalid MAX_MEDIA_BYTES: "${envValue}"\n` +
+        `  → Must be a positive integer in bytes. Default: ${defaultValue}`
+    )
+  }
+
+  return parsed
+}
+
 // Validate and parse target chat IDs
 function parseTargets(targetsStr) {
   const ids = targetsStr
@@ -70,9 +87,18 @@ function parseTargets(targetsStr) {
 /**
  * Application configuration object (frozen for immutability)
  */
+// Validate API_ID conversion
+const apiId = Number(process.env.API_ID)
+if (!Number.isInteger(apiId) || apiId <= 0) {
+  throw new Error(
+    `Invalid API_ID: "${process.env.API_ID}"\n` +
+      `  → Must be a positive integer. Get from https://my.telegram.org/apps`
+  )
+}
+
 export const config = Object.freeze({
   // Telegram API credentials
-  apiId: Number(process.env.API_ID),
+  apiId,
   apiHash: process.env.API_HASH,
   phone: process.env.PHONE_NUMBER,
   botToken: process.env.TELEGRAM_BOT_TOKEN,
@@ -93,7 +119,7 @@ export const config = Object.freeze({
     'gi',
     'STRIP_REGEX'
   ),
-  maxMediaBytes: Number(process.env.MAX_MEDIA_BYTES || 10 * 1024 * 1024), // 10 MiB default
+  maxMediaBytes: validateMaxMediaBytes(process.env.MAX_MEDIA_BYTES), // 10 MiB default
   logLevel: process.env.LOG_LEVEL || 'info'
 })
 
