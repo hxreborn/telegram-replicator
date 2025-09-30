@@ -43,20 +43,37 @@ export function filterMessage(msg, config) {
   // Determine media type if present
   let mediaType = null
   if (msg.media) {
-    if (msg.media._ === 'messageMediaPhoto') {
-      mediaType = 'photo'
-    } else if (msg.media._ === 'messageMediaDocument') {
-      // Check size limit for documents
-      const size = msg.media.document?.size
-      if (size && BigInt(size) > BigInt(config.maxMediaBytes)) {
-        logger.debug({ msgId: msg.id, size }, 'Drop: media exceeds size limit')
-        return null
-      }
-      mediaType = 'document'
-    } else {
+    // Map Telegram media types to our simplified types
+    const mediaTypeMap = {
+      messageMediaPhoto: 'photo',
+      messageMediaDocument: 'document',
+      messageMediaVideo: 'video',
+      messageMediaAudio: 'audio'
+    }
+
+    const detectedType = mediaTypeMap[msg.media._]
+    if (!detectedType) {
       logger.debug({ msgId: msg.id, type: msg.media._ }, 'Drop: unsupported media type')
       return null
     }
+
+    // Check if this media type is enabled in configuration
+    if (!config.supportedMediaTypes.includes(detectedType)) {
+      logger.debug(
+        { msgId: msg.id, type: detectedType, supported: config.supportedMediaTypes },
+        'Drop: media type not supported'
+      )
+      return null
+    }
+
+    // Check size limit for all media types
+    const size = msg.media.document?.size || msg.media.video?.size || msg.media.audio?.size
+    if (size && BigInt(size) > BigInt(config.maxMediaBytes)) {
+      logger.debug({ msgId: msg.id, size, type: detectedType }, 'Drop: media exceeds size limit')
+      return null
+    }
+
+    mediaType = detectedType
   }
 
   return {

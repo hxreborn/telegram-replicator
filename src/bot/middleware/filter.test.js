@@ -6,7 +6,8 @@ import { filterMessage } from './filter.js'
 const mockConfig = {
   filterRegex: /tech|update/i,
   stripRegex: /Powered by.*$/gi,
-  maxMediaBytes: 10 * 1024 * 1024
+  maxMediaBytes: 10 * 1024 * 1024,
+  supportedMediaTypes: ['photo', 'document', 'video', 'audio']
 }
 
 test('filterMessage returns null for messages without text', () => {
