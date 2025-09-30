@@ -85,7 +85,7 @@ export async function createSender(token, targets) {
           let retryAfter =
             typeof retryAfterParam === 'number' && retryAfterParam > 0 ? retryAfterParam : null
 
-          if (!retryAfter && err.response?.error_code === 429) {
+          if (!retryAfter && (err.response?.error_code === 429 || err.code === 429)) {
             retryAfter = 30
           }
 
