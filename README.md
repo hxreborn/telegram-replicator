@@ -22,6 +22,7 @@ npm install && npm start
 ```
 
 **Requirements:**
+
 - Node.js 18+
 - Telegram API credentials (https://my.telegram.org/apps)
 - Bot token (@BotFather)
@@ -45,6 +46,7 @@ TG_TARGETS=-1001234567890,-1009876543210
 # Optional filtering (defaults shown)
 FILTER_REGEX=tech|technology|announcement|news|update  # case-insensitive
 STRIP_REGEX=(?:^|\n)Powered by.*$                      # global, case-insensitive
+TG_2FA_PASSWORD=your_totp_password                     # optional, for users with Telegram 2FA
 
 # System
 MAX_MEDIA_BYTES=10485760  # 10MB
@@ -61,16 +63,15 @@ Regex compiled at startup. Test patterns at regex101.com (JavaScript flavor).
 
 **`AUTH_KEY_UNREGISTERED`**: Session expired. Delete `.telegram-session` and re-authenticate.
 
-**`FLOOD_WAIT_X`**: Rate limited. Tool doesn't retry—failed targets skipped, others still receive the message.
+**`FLOOD_WAIT_X`**: Rate limited. The bot waits once (up to 60s) and retries that target; if it still fails the error is logged and processing continues.
 
 **Messages not forwarded**: Check filter matches (`FILTER_REGEX`), strip doesn't empty content (`STRIP_REGEX`), or message has text (media-only dropped). Set `LOG_LEVEL=debug` to see drop reasons.
 
 ## Limitations
 
 - No auto-reconnect on disconnect (use process manager: systemd/pm2)
-- No rate limit retry (FLOOD_WAIT fails to that target, others proceed)
 - Only photos and documents (no videos/stickers/polls)
-- No 2FA password prompt (hardcoded empty string, edit `listener.js:44` if needed)
+- 2FA support requires setting `TG_2FA_PASSWORD` or responding to the interactive prompt on first run
 - Forwards new messages only (edits ignored)
 
 `.telegram-session` and `.env` contain plaintext credentials. Keep them secure.
