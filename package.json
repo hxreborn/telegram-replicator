@@ -1,36 +1,44 @@
 {
   "name": "telegram-message-replicator",
   "version": "1.0.0",
+  "description": "Simple event-driven message replicator for Telegram. Monitors one source channel, applies regex filters, broadcasts to multiple targets.",
   "type": "module",
-  "private": true,
-  "description": "A simple, event-driven Telegram message replicator.",
-  "main": "src/index.js",
+  "author": "hexpreso <32096750+hexpreso@users.noreply.github.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hexpreso/telegram-replicator.git"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "replicator",
+    "message-forwarder",
+    "gramjs",
+    "telegraf"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
     "test": "node --test",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "dotenv": "^16.5.0",
     "pino": "^9.0.0",
+    "pino-caller": "^4.0.0",
+    "pino-pretty": "^10.3.0",
     "telegraf": "^4.16.3",
     "telegram": "^2.26.22"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
-    "nodemon": "^3.1.0",
-    "pino-caller": "^4.0.0",
-    "pino-pretty": "^10.3.0",
-    "prettier": "^3.2.5"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/hxreborn/telegram-replicator.git"
-  },
-  "author": "hxreborn",
-  "license": "MIT"
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^9.1.2",
+    "prettier": "^3.6.2"
+  }
 }
