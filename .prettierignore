@@ -26,5 +26,5 @@ logs/
 *.min.js
 *.bundle.js
 
-# Markdown files (managed manually)
+# Markdown files
 CLAUDE.md
