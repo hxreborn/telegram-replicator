@@ -91,3 +91,118 @@ test('filterMessage accepts documents within size limit', () => {
   assert.ok(result)
   assert.strictEqual(result.mediaType, 'document')
 })
+
+test('filterMessage detects video from media.video flag', () => {
+  const msg = {
+    id: 10,
+    caption: 'Tech video update',
+    media: {
+      _: 'messageMediaDocument',
+      video: true,
+      document: { size: 5 * 1024 * 1024 }
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  assert.ok(result)
+  assert.strictEqual(result.mediaType, 'video')
+  assert.strictEqual(result.text, 'Tech video update')
+})
+
+test('filterMessage detects audio from documentAttributeAudio', () => {
+  const msg = {
+    id: 11,
+    caption: 'Tech podcast update',
+    media: {
+      _: 'messageMediaDocument',
+      document: {
+        size: 3 * 1024 * 1024,
+        attributes: [{ _: 'documentAttributeAudio', voice: false, duration: 180 }]
+      }
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  assert.ok(result)
+  assert.strictEqual(result.mediaType, 'audio')
+})
+
+test('filterMessage detects voice messages from media.voice flag', () => {
+  const msg = {
+    id: 12,
+    caption: 'Tech voice note',
+    media: {
+      _: 'messageMediaDocument',
+      voice: true,
+      document: { size: 1 * 1024 * 1024 }
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  // Voice is detected but needs to be in supportedMediaTypes
+  // With default config including 'audio', voice will be dropped
+  assert.strictEqual(result, null)
+})
+
+test('filterMessage rejects video exceeding size limit', () => {
+  const msg = {
+    id: 13,
+    caption: 'Tech update',
+    media: {
+      _: 'messageMediaDocument',
+      video: true,
+      document: { size: 20 * 1024 * 1024 } // 20MB > 10MB limit
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  assert.strictEqual(result, null)
+})
+
+test('filterMessage rejects audio exceeding size limit', () => {
+  const msg = {
+    id: 14,
+    caption: 'Tech update',
+    media: {
+      _: 'messageMediaDocument',
+      document: {
+        size: 15 * 1024 * 1024, // 15MB > 10MB limit
+        attributes: [{ _: 'documentAttributeAudio', voice: false, duration: 600 }]
+      }
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  assert.strictEqual(result, null)
+})
+
+test('filterMessage rejects unsupported media types', () => {
+  const restrictiveConfig = {
+    ...mockConfig,
+    supportedMediaTypes: ['photo'] // Only photos
+  }
+  const msg = {
+    id: 15,
+    caption: 'Tech update',
+    media: {
+      _: 'messageMediaDocument',
+      video: true,
+      document: { size: 5 * 1024 * 1024 }
+    }
+  }
+  const result = filterMessage(msg, restrictiveConfig)
+  assert.strictEqual(result, null)
+})
+
+test('filterMessage handles audio with voice:true in attributes as voice', () => {
+  const msg = {
+    id: 16,
+    caption: 'Tech update',
+    media: {
+      _: 'messageMediaDocument',
+      document: {
+        size: 2 * 1024 * 1024,
+        attributes: [{ _: 'documentAttributeAudio', voice: true, duration: 60 }]
+      }
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  // Should be detected as document, not audio (since voice:true in attribute)
+  assert.ok(result)
+  assert.strictEqual(result.mediaType, 'document')
+})
