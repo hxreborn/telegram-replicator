@@ -43,37 +43,55 @@ export function filterMessage(msg, config) {
   // Determine media type if present
   let mediaType = null
   if (msg.media) {
-    // Map Telegram media types to our simplified types
-    const mediaTypeMap = {
-      messageMediaPhoto: 'photo',
-      messageMediaDocument: 'document',
-      messageMediaVideo: 'video',
-      messageMediaAudio: 'audio'
-    }
+    const mediaKind = msg.media._
 
-    const detectedType = mediaTypeMap[msg.media._]
-    if (!detectedType) {
-      logger.debug({ msgId: msg.id, type: msg.media._ }, 'Drop: unsupported media type')
+    // Handle photo media
+    if (mediaKind === 'messageMediaPhoto') {
+      mediaType = 'photo'
+    }
+    // Handle document-based media (videos, audio, files)
+    else if (mediaKind === 'messageMediaDocument') {
+      // GramJS sets flags directly on media object for video/voice
+      if (msg.media.video === true) {
+        mediaType = 'video'
+      } else if (msg.media.voice === true) {
+        // Voice messages - currently treated as separate type
+        // Could be supported as 'audio' or 'voice' depending on config
+        mediaType = 'voice'
+      } else {
+        // Check document attributes for audio (non-voice)
+        const attributes = msg.media.document?.attributes || []
+        const hasAudioAttr = attributes.some(
+          (attr) => attr._ === 'documentAttributeAudio' && attr.voice !== true
+        )
+
+        if (hasAudioAttr) {
+          mediaType = 'audio'
+        } else {
+          // Regular document (PDF, ZIP, etc.)
+          mediaType = 'document'
+        }
+      }
+    } else {
+      logger.debug({ msgId: msg.id, type: mediaKind }, 'Drop: unsupported media type')
       return null
     }
 
     // Check if this media type is enabled in configuration
-    if (!config.supportedMediaTypes.includes(detectedType)) {
+    if (!config.supportedMediaTypes.includes(mediaType)) {
       logger.debug(
-        { msgId: msg.id, type: detectedType, supported: config.supportedMediaTypes },
+        { msgId: msg.id, type: mediaType, supported: config.supportedMediaTypes },
         'Drop: media type not supported'
       )
       return null
     }
 
-    // Check size limit for all media types
-    const size = msg.media.document?.size || msg.media.video?.size || msg.media.audio?.size
+    // Check size limit for document-based media
+    const size = msg.media.document?.size
     if (size && BigInt(size) > BigInt(config.maxMediaBytes)) {
-      logger.debug({ msgId: msg.id, size, type: detectedType }, 'Drop: media exceeds size limit')
+      logger.debug({ msgId: msg.id, size, type: mediaType }, 'Drop: media exceeds size limit')
       return null
     }
-
-    mediaType = detectedType
   }
 
   return {
