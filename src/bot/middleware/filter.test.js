@@ -125,7 +125,7 @@ test('filterMessage detects audio from documentAttributeAudio', () => {
   assert.strictEqual(result.mediaType, 'audio')
 })
 
-test('filterMessage detects voice messages from media.voice flag', () => {
+test('filterMessage drops voice messages when not supported', () => {
   const msg = {
     id: 12,
     caption: 'Tech voice note',
@@ -136,9 +136,27 @@ test('filterMessage detects voice messages from media.voice flag', () => {
     }
   }
   const result = filterMessage(msg, mockConfig)
-  // Voice is detected but needs to be in supportedMediaTypes
-  // With default config including 'audio', voice will be dropped
   assert.strictEqual(result, null)
+})
+
+test('filterMessage allows voice messages when supported', () => {
+  const voiceConfig = {
+    ...mockConfig,
+    supportedMediaTypes: [...mockConfig.supportedMediaTypes, 'voice']
+  }
+  const msg = {
+    id: 17,
+    caption: 'Tech voice note',
+    media: {
+      _: 'messageMediaDocument',
+      voice: true,
+      document: { size: 1 * 1024 * 1024 }
+    }
+  }
+  const result = filterMessage(msg, voiceConfig)
+  assert.ok(result)
+  assert.strictEqual(result.mediaType, 'voice')
+  assert.strictEqual(result.text, 'Tech voice note')
 })
 
 test('filterMessage rejects video exceeding size limit', () => {

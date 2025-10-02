@@ -64,7 +64,7 @@ function getSupportedMediaTypes(envValue) {
     .map((t) => t.trim().toLowerCase())
     .filter((t) => t.length > 0)
 
-  const validTypes = ['photo', 'document', 'video', 'audio']
+  const validTypes = ['photo', 'document', 'video', 'audio', 'voice']
   const invalidTypes = types.filter((t) => !validTypes.includes(t))
 
   if (invalidTypes.length > 0) {

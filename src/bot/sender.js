@@ -188,6 +188,13 @@ async function sendMedia(bot, chatId, buffer, type, caption) {
       options
     )
     return result.audio?.file_id
+  } else if (type === 'voice') {
+    const result = await bot.telegram.sendVoice(
+      chatId,
+      { source: buffer, filename: 'voice.ogg' },
+      options
+    )
+    return result.voice?.file_id
   } else if (type === 'document') {
     const result = await bot.telegram.sendDocument(
       chatId,
@@ -212,6 +219,8 @@ async function sendCachedMedia(bot, chatId, fileId, type, caption) {
     await bot.telegram.sendVideo(chatId, fileId, options)
   } else if (type === 'audio') {
     await bot.telegram.sendAudio(chatId, fileId, options)
+  } else if (type === 'voice') {
+    await bot.telegram.sendVoice(chatId, fileId, options)
   } else if (type === 'document') {
     await bot.telegram.sendDocument(chatId, fileId, options)
   }
