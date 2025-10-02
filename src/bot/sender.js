@@ -84,14 +84,9 @@ export async function createSender(token, targets) {
   // Global error handler
   bot.catch((err) => logger.error({ err }, 'Uncaught bot error'))
 
-  // Clear any existing webhook
+  // Clear any existing webhooks
   await bot.telegram.deleteWebhook({ drop_pending_updates: true })
   logger.debug('Webhook cleared')
-
-  // Launch bot in long-polling mode
-  await bot.launch({
-    dropPendingUpdates: true
-  })
 
   const info = await bot.telegram.getMe()
   logger.info({ username: info.username }, 'Sender bot ready')
@@ -170,7 +165,7 @@ export async function createSender(token, targets) {
      */
     stop: (signal) => {
       logger.info({ signal }, 'Stopping sender bot')
-      bot.stop(signal)
+      // No need to stop bot since we don't use long-polling mode
     }
   }
 }
