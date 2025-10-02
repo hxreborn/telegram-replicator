@@ -7,7 +7,6 @@ import caller from 'pino-caller'
  * Validates required environment variables and exports frozen config + logger.
  */
 
-// Required environment variables with helpful context
 const REQUIRED_VARS = {
   API_ID: 'Get from https://my.telegram.org/apps',
   API_HASH: 'Get from https://my.telegram.org/apps',
@@ -17,9 +16,13 @@ const REQUIRED_VARS = {
   TG_TARGETS: 'Comma-separated chat IDs (e.g., -1001234567890,-1009876543210)'
 }
 
-for (const [key, hint] of Object.entries(REQUIRED_VARS)) {
-  if (!process.env[key]) {
-    throw new Error(`Missing required environment variable: ${key}\n  → ${hint}`)
+const isTest = process.env.NODE_ENV === 'test'
+
+if (!isTest) {
+  for (const [key, hint] of Object.entries(REQUIRED_VARS)) {
+    if (!process.env[key]) {
+      throw new Error(`Missing required environment variable: ${key}\n  → ${hint}`)
+    }
   }
 }
 
@@ -106,8 +109,8 @@ function parseTargets(targetsStr) {
 /**
  * Application configuration object (frozen for immutability)
  */
-const apiId = Number(process.env.API_ID)
-if (!Number.isInteger(apiId) || apiId <= 0) {
+const apiId = isTest ? 12345 : Number(process.env.API_ID)
+if (!isTest && (!Number.isInteger(apiId) || apiId <= 0)) {
   throw new Error(
     `Invalid API_ID: "${process.env.API_ID}"\n` +
       `  → Must be a positive integer. Get from https://my.telegram.org/apps`
@@ -115,16 +118,14 @@ if (!Number.isInteger(apiId) || apiId <= 0) {
 }
 
 export const config = Object.freeze({
-  // Telegram API credentials
   apiId,
-  apiHash: process.env.API_HASH,
-  phone: process.env.PHONE_NUMBER,
-  botToken: process.env.TELEGRAM_BOT_TOKEN,
+  apiHash: isTest ? 'test-hash' : process.env.API_HASH,
+  phone: isTest ? '+1234567890' : process.env.PHONE_NUMBER,
+  botToken: isTest ? 'test-bot-token' : process.env.TELEGRAM_BOT_TOKEN,
   twoFactorPassword: process.env.TG_2FA_PASSWORD || '',
 
-  // Channel configuration
-  source: process.env.TG_SOURCE_CHANNEL,
-  targets: parseTargets(process.env.TG_TARGETS),
+  source: isTest ? '@test-channel' : process.env.TG_SOURCE_CHANNEL,
+  targets: isTest ? [-1001234567890] : parseTargets(process.env.TG_TARGETS),
 
   // Optional configuration (compiled regex)
   filterRegex: compileRegex(
@@ -155,7 +156,7 @@ export function maskChatId(chatId) {
 /**
  * Pino logger with caller information and pretty printing in development
  */
-const isDev = process.env.NODE_ENV !== 'production'
+const isDev = process.env.NODE_ENV === 'development'
 
 export const logger = caller(
   pino({
