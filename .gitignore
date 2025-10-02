@@ -222,3 +222,4 @@ download-ripgrepja3o7f/
 *.md
 !README.md
 !LICENSE.md
+logs/
