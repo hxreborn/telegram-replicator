@@ -40,40 +40,44 @@ export function filterMessage(msg, config) {
   // HTML escape
   const safe = escapeHtml(cleaned)
 
-  // Determine media type if present
   let mediaType = null
   if (msg.media) {
-    const mediaKind = msg.media._
+    const typeIdentifier = msg.media._ || msg.media.className || msg.media.constructor?.name
 
-    // Handle photo media
-    if (mediaKind === 'messageMediaPhoto') {
+    logger.debug(
+      {
+        msgId: msg.id,
+        '_': msg.media._,
+        className: msg.media.className,
+        constructorName: msg.media.constructor?.name,
+        typeIdentifier,
+        hasPhoto: !!msg.media.photo,
+        hasDocument: !!msg.media.document,
+        hasVideo: msg.media.video === true,
+        hasVoice: msg.media.voice === true,
+        allProps: Object.keys(msg.media)
+      },
+      'Media analysis'
+    )
+
+    const typeStr = String(typeIdentifier || '').toLowerCase()
+
+    if (typeStr.includes('photo') || msg.media.photo) {
       mediaType = 'photo'
-    }
-    // Handle document-based media (videos, audio, files)
-    else if (mediaKind === 'messageMediaDocument') {
-      // GramJS sets flags directly on media object for video/voice
+    } else if (typeStr.includes('document') || msg.media.document) {
       if (msg.media.video === true) {
         mediaType = 'video'
       } else if (msg.media.voice === true) {
-        // Voice messages - currently treated as separate type
-        // Could be supported as 'audio' or 'voice' depending on config
         mediaType = 'voice'
       } else {
-        // Check document attributes for audio (non-voice)
         const attributes = msg.media.document?.attributes || []
         const hasAudioAttr = attributes.some(
           (attr) => attr._ === 'documentAttributeAudio' && attr.voice !== true
         )
-
-        if (hasAudioAttr) {
-          mediaType = 'audio'
-        } else {
-          // Regular document (PDF, ZIP, etc.)
-          mediaType = 'document'
-        }
+        mediaType = hasAudioAttr ? 'audio' : 'document'
       }
     } else {
-      logger.debug({ msgId: msg.id, type: mediaKind }, 'Drop: unsupported media type')
+      logger.debug({ msgId: msg.id, typeIdentifier }, 'Drop: unknown media type')
       return null
     }
 
