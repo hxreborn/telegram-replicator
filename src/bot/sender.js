@@ -4,7 +4,7 @@ import { logger, maskChatId } from '../config.js'
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
 const MAX_RETRIES = 4
-const BASE_DELAY_MS = 1000 // 1 second
+const BASE_DELAY_MS = 1000
 
 /**
  * Retry with exponential backoff and jitter
@@ -17,9 +17,8 @@ async function retryWithBackoff(initialRetryAfter, chatId, sourceId, sendToTarge
   while (attempt < MAX_RETRIES) {
     attempt++
 
-    // Calculate exponential backoff with jitter
     const backoffMs = BASE_DELAY_MS * Math.pow(2, attempt - 1)
-    const jitterMs = Math.random() * 1000 // Add up to 1 second of jitter
+    const jitterMs = Math.random() * 1000
     const delayMs = Math.max(retryAfter * 1000, backoffMs) + jitterMs
 
     logger.warn(
@@ -45,14 +44,13 @@ async function retryWithBackoff(initialRetryAfter, chatId, sourceId, sendToTarge
         },
         `Message sent (after ${attempt} retries)`
       )
-      return // Success, exit retry loop
+      return
     } catch (retryErr) {
-      // Check if this is still a rate limit error with new retry time
       const newRetryAfter =
         retryErr.parameters?.retry_after ?? retryErr.response?.parameters?.retry_after
 
       if (newRetryAfter && typeof newRetryAfter === 'number' && newRetryAfter > 0) {
-        retryAfter = Math.min(newRetryAfter, 60) // Update with new retry time
+        retryAfter = Math.min(newRetryAfter, 60)
       }
 
       if (attempt === MAX_RETRIES) {
@@ -81,10 +79,8 @@ async function retryWithBackoff(initialRetryAfter, chatId, sourceId, sendToTarge
 export async function createSender(token, targets) {
   const bot = new Telegraf(token)
 
-  // Global error handler
   bot.catch((err) => logger.error({ err }, 'Uncaught bot error'))
 
-  // Clear any existing webhooks
   await bot.telegram.deleteWebhook({ drop_pending_updates: true })
   logger.debug('Webhook cleared')
 
@@ -106,7 +102,6 @@ export async function createSender(token, targets) {
       for (const chatId of targets) {
         const sendToTarget = async () => {
           if (media && mediaType) {
-            // Split text into caption and body
             const caption = text.length <= CAPTION_LIMIT ? text : text.slice(0, CAPTION_LIMIT)
 
             const bodyChunks =
@@ -114,7 +109,6 @@ export async function createSender(token, targets) {
                 ? splitIntoChunks(text.slice(CAPTION_LIMIT), MESSAGE_LIMIT)
                 : []
 
-            // Send media (upload first time, reuse after)
             if (!cachedFileId) {
               const result = await sendMedia(bot, chatId, media, mediaType, caption)
               cachedFileId = result
@@ -122,12 +116,10 @@ export async function createSender(token, targets) {
               await sendCachedMedia(bot, chatId, cachedFileId, mediaType, caption)
             }
 
-            // Send remaining text chunks
             for (const chunk of bodyChunks) {
               await bot.telegram.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
             }
           } else {
-            // Text only - split into chunks
             const chunks = splitIntoChunks(text, MESSAGE_LIMIT)
             for (const chunk of chunks) {
               await bot.telegram.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
@@ -139,7 +131,6 @@ export async function createSender(token, targets) {
           await sendToTarget()
           logger.info({ chatId: maskChatId(chatId), sourceId }, 'Message sent')
         } catch (err) {
-          // Check for rate limit (FLOOD_WAIT)
           const retryAfterParam =
             err.parameters?.retry_after ?? err.response?.parameters?.retry_after
 
@@ -160,12 +151,11 @@ export async function createSender(token, targets) {
     },
 
     /**
-     * Stops the bot (graceful shutdown)
+     * Stops the bot
      * @param {string} signal Signal name for logging
      */
     stop: (signal) => {
       logger.info({ signal }, 'Stopping sender bot')
-      // No need to stop bot since we don't use long-polling mode
     }
   }
 }
@@ -244,13 +234,12 @@ export function splitIntoChunks(text, limit) {
       break
     }
 
-    // Try to break at word boundary
     const chunk = text.slice(start, end)
     const lastSpace = chunk.lastIndexOf(' ')
 
     if (lastSpace > 0) {
       chunks.push(text.slice(start, start + lastSpace))
-      start += lastSpace + 1 // Skip space
+      start += lastSpace + 1
     } else {
       // No space found - force break (long URL, base64, etc.)
       chunks.push(chunk)

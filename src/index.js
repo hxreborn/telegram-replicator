@@ -12,13 +12,10 @@ import { filterMessage } from './bot/middleware/filter.js'
  * 3. Forwards filtered messages to multiple target chats (via Telegraf Bot API)
  */
 
-// Message deduplication cache with TTL
 const processedMessages = new Set()
-const CLEANUP_INTERVAL = 60 * 60 * 1000 // 1 hour
-const MESSAGE_TTL = 60 * 60 * 1000 // 1 hour
 const messageTimestamps = new Map()
+const MESSAGE_TTL = 60 * 60 * 1000
 
-// Cleanup old message IDs to prevent memory leaks
 function cleanupOldMessages() {
   const now = Date.now()
   for (const [msgId, timestamp] of messageTimestamps.entries()) {
@@ -36,13 +33,11 @@ function cleanupOldMessages() {
   )
 }
 
-// Check if message was already processed
 function isMessageProcessed(msgId) {
   if (processedMessages.has(msgId)) {
     return true
   }
 
-  // Mark as processed
   processedMessages.add(msgId)
   messageTimestamps.set(msgId, Date.now())
   return false
@@ -51,7 +46,6 @@ function isMessageProcessed(msgId) {
 async function main() {
   logger.info('Telegram Replicator starting')
 
-  // Log comprehensive configuration summary
   logger.info(
     {
       source: config.source,
@@ -66,17 +60,14 @@ async function main() {
     'Configuration loaded'
   )
 
-  // Security warnings for sensitive settings
   if (config.logLevel === 'debug') {
     logger.warn('Debug logging enabled - sensitive information may be logged')
   }
 
   try {
-    // Initialize sender (Telegraf bot)
     const sender = await createSender(config.botToken, config.targets)
     logger.info({ targets: config.targets.map(maskChatId) }, 'Targets configured')
 
-    // Initialize listener (GramJS user client)
     const listener = await createListener({
       apiId: config.apiId,
       apiHash: config.apiHash,
@@ -94,27 +85,22 @@ async function main() {
       'Filters configured'
     )
 
-    // Start cleanup interval for message deduplication
-    const cleanupInterval = setInterval(cleanupOldMessages, CLEANUP_INTERVAL)
+    const cleanupInterval = setInterval(cleanupOldMessages, MESSAGE_TTL)
 
-    // Initialize deduplication statistics
     let duplicateCount = 0
 
     // Wire up message pipeline: listener → filter → sender
     listener.on('message', async (msg) => {
       try {
-        // Check for duplicate messages
         if (isMessageProcessed(msg.id)) {
           duplicateCount++
           logger.debug({ msgId: msg.id, duplicateCount }, 'Duplicate message ignored')
           return
         }
 
-        // Filter and transform message
         const filtered = filterMessage(msg, config)
         if (!filtered) return
 
-        // Download media if present
         let mediaBuffer = null
         if (filtered.mediaType) {
           mediaBuffer = await listener.downloadMedia(msg, config.maxMediaBytes)
@@ -124,7 +110,6 @@ async function main() {
           }
         }
 
-        // Send to all targets
         await sender.send({
           text: filtered.text,
           media: mediaBuffer,
@@ -138,7 +123,6 @@ async function main() {
 
     logger.info('Replicator active - listening for messages')
 
-    // Log deduplication stats periodically
     const statsInterval = setInterval(() => {
       logger.info(
         {
@@ -148,7 +132,7 @@ async function main() {
         },
         'Message processing statistics'
       )
-    }, 5 * 60 * 1000) // Every 5 minutes
+    }, 5 * 60 * 1000)
 
     // Graceful shutdown handlers (best practice pattern)
     const shutdown = async (signal) => {

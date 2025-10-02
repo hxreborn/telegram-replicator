@@ -17,14 +17,12 @@ const REQUIRED_VARS = {
   TG_TARGETS: 'Comma-separated chat IDs (e.g., -1001234567890,-1009876543210)'
 }
 
-// Validate all required vars are present
 for (const [key, hint] of Object.entries(REQUIRED_VARS)) {
   if (!process.env[key]) {
     throw new Error(`Missing required environment variable: ${key}\n  → ${hint}`)
   }
 }
 
-// Validate and compile regex patterns
 function compileRegex(pattern, flags, name) {
   try {
     return new RegExp(pattern, flags)
@@ -37,9 +35,8 @@ function compileRegex(pattern, flags, name) {
   }
 }
 
-// Validate MAX_MEDIA_BYTES
 function validateMaxMediaBytes(envValue) {
-  const defaultValue = 10 * 1024 * 1024 // 10 MiB
+  const defaultValue = 10 * 1024 * 1024
 
   if (!envValue) return defaultValue
 
@@ -54,7 +51,6 @@ function validateMaxMediaBytes(envValue) {
   return parsed
 }
 
-// Parse supported media types
 function getSupportedMediaTypes(envValue) {
   const defaultTypes = ['photo', 'document']
 
@@ -78,7 +74,6 @@ function getSupportedMediaTypes(envValue) {
   return types.length > 0 ? types : defaultTypes
 }
 
-// Validate and parse target chat IDs
 function parseTargets(targetsStr) {
   const ids = targetsStr
     .split(',')
@@ -111,7 +106,6 @@ function parseTargets(targetsStr) {
 /**
  * Application configuration object (frozen for immutability)
  */
-// Validate API_ID conversion
 const apiId = Number(process.env.API_ID)
 if (!Number.isInteger(apiId) || apiId <= 0) {
   throw new Error(
@@ -143,7 +137,7 @@ export const config = Object.freeze({
     'gi',
     'STRIP_REGEX'
   ),
-  maxMediaBytes: validateMaxMediaBytes(process.env.MAX_MEDIA_BYTES), // 10 MiB default
+  maxMediaBytes: validateMaxMediaBytes(process.env.MAX_MEDIA_BYTES),
   supportedMediaTypes: getSupportedMediaTypes(process.env.SUPPORTED_MEDIA_TYPES),
   logLevel: process.env.LOG_LEVEL || 'info'
 })

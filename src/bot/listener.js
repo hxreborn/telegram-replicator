@@ -23,13 +23,11 @@ const SESSION_FILE = '.telegram-session'
 export async function createListener({ apiId, apiHash, phone, source, twoFactorPassword = '' }) {
   const emitter = new EventEmitter()
 
-  // Load existing session or create empty
   const sessionPath = path.resolve(SESSION_FILE)
   let session = ''
   if (fs.existsSync(sessionPath)) {
     try {
       const stats = fs.statSync(sessionPath)
-      // Ensure session file has correct permissions (owner read/write only)
       if (stats.mode & 0o077) {
         logger.warn(
           { file: SESSION_FILE, currentMode: stats.mode.toString(8) },
@@ -44,12 +42,10 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     }
   }
 
-  // Initialize Telegram client
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
     connectionRetries: 5
   })
 
-  // Authentication flow
   if (!session) {
     logger.info('No session found, starting authentication')
     await client.start({
@@ -64,7 +60,6 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
           return envPassword
         }
 
-        // Prompt for 2FA if needed
         return new Promise((resolve) => {
           process.stdout.write('Enter 2FA password (press Enter to skip): ')
           process.stdin.once('data', (data) => resolve(data.toString().trim()))
@@ -79,7 +74,6 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     })
     const sessionData = client.session.save()
     fs.writeFileSync(sessionPath, sessionData, { mode: 0o600 })
-    // Verify file was written with correct permissions
     const stats = fs.statSync(sessionPath)
     if (stats.mode & 0o077) {
       logger.error(
@@ -98,7 +92,6 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
   // Get dialogs to ensure connection is ready
   await client.getDialogs({ limit: 1 })
 
-  // Resolve source channel entity
   let channelId
   try {
     const entity = await client.getEntity(source)
@@ -123,12 +116,10 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     )
   }
 
-  // Attach event handler for new messages
   client.addEventHandler((event) => {
     const msg = event.message
     if (!msg) return
 
-    // Check if message is from our source channel
     const msgChannelId = msg.peerId?.channelId
     if (msgChannelId && BigInt(msgChannelId) === channelId) {
       logger.debug(
@@ -145,7 +136,6 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
 
   logger.info('Listener ready')
 
-  // Return EventEmitter with additional methods
   return Object.assign(emitter, {
     /**
      * Disconnects the Telegram client
@@ -164,7 +154,6 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     downloadMedia: async (msg, maxBytes) => {
       if (!msg.media) return null
 
-      // Check size for documents
       const size = msg.media.document?.size
       if (size && BigInt(size) > BigInt(maxBytes)) {
         logger.debug({ msgId: msg.id, size }, 'Media exceeds size limit')
