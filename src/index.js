@@ -2,6 +2,7 @@ import { config, logger, maskChatId } from './config.js'
 import { createListener } from './bot/listener.js'
 import { createSender } from './bot/sender.js'
 import { filterMessage } from './bot/middleware/filter.js'
+import { LRUCache } from './utils/lru-cache.js'
 
 /**
  * Telegram Message Replicator
@@ -12,34 +13,15 @@ import { filterMessage } from './bot/middleware/filter.js'
  * 3. Forwards filtered messages to multiple target chats (via Telegraf Bot API)
  */
 
-const processedMessages = new Set()
-const messageTimestamps = new Map()
-const MESSAGE_TTL = 60 * 60 * 1000
-
-function cleanupOldMessages() {
-  const now = Date.now()
-  for (const [msgId, timestamp] of messageTimestamps.entries()) {
-    if (now - timestamp > MESSAGE_TTL) {
-      processedMessages.delete(msgId)
-      messageTimestamps.delete(msgId)
-    }
-  }
-  logger.debug(
-    {
-      cachedCount: processedMessages.size,
-      cleanedUp: messageTimestamps.size
-    },
-    'Message cache cleanup completed'
-  )
-}
+const MESSAGE_TTL = 60 * 60 * 1000 // 1 hour
+const messageCache = new LRUCache({ maxSize: 1000, ttl: MESSAGE_TTL })
 
 function isMessageProcessed(msgId) {
-  if (processedMessages.has(msgId)) {
+  if (messageCache.has(msgId)) {
     return true
   }
 
-  processedMessages.add(msgId)
-  messageTimestamps.set(msgId, Date.now())
+  messageCache.set(msgId, true)
   return false
 }
 
@@ -85,7 +67,10 @@ async function main() {
       'Filters configured'
     )
 
-    const cleanupInterval = setInterval(cleanupOldMessages, MESSAGE_TTL)
+    const cleanupInterval = setInterval(() => {
+      const stats = messageCache.cleanup()
+      logger.debug({ ...stats }, 'Message cache cleanup completed')
+    }, MESSAGE_TTL)
 
     let duplicateCount = 0
 
@@ -126,9 +111,9 @@ async function main() {
     const statsInterval = setInterval(() => {
       logger.info(
         {
-          processedCount: processedMessages.size,
+          processedCount: messageCache.size,
           duplicateCount,
-          cacheSize: processedMessages.size
+          cacheSize: messageCache.size
         },
         'Message processing statistics'
       )
@@ -143,9 +128,9 @@ async function main() {
 
         logger.info(
           {
-            totalProcessed: processedMessages.size,
+            totalProcessed: messageCache.size,
             duplicateCount,
-            cacheSize: processedMessages.size
+            cacheSize: messageCache.size
           },
           'Final deduplication statistics'
         )
