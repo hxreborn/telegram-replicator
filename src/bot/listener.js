@@ -134,6 +134,26 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     }
   }, new NewMessage({}))
 
+  // Handle connection state changes - exit on disconnect to let PM2 restart
+  client.on('disconnected', () => {
+    logger.error('GramJS connection lost, exiting for clean restart')
+    process.exit(1)
+  })
+
+  // Additional connection state monitoring
+  const connectionState = client._connection?.state
+  if (connectionState !== undefined) {
+    const checkConnection = setInterval(() => {
+      if (!client.connected) {
+        logger.error('Connection check failed - client not connected, exiting')
+        clearInterval(checkConnection)
+        process.exit(1)
+      }
+    }, 30000) // Check every 30 seconds
+
+    emitter.once('stop', () => clearInterval(checkConnection))
+  }
+
   logger.info('Listener ready')
 
   return Object.assign(emitter, {
@@ -142,6 +162,7 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
      */
     stop: async () => {
       logger.info('Stopping listener')
+      emitter.emit('stop')
       await client.disconnect()
     },
 
