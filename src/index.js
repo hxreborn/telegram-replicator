@@ -4,8 +4,11 @@ import { createSender } from './bot/sender.js'
 import { filterMessage } from './bot/middleware/filter.js'
 import { LRUCache } from './utils/lru-cache.js'
 
-const MESSAGE_TTL = 60 * 60 * 1000 // 1 hour
-const messageCache = new LRUCache({ maxSize: 1000, ttl: MESSAGE_TTL })
+const MESSAGE_TTL_MS = 60 * 60 * 1000
+const MESSAGE_CACHE_MAX_SIZE = 1000
+const STATS_INTERVAL_MS = 5 * 60 * 1000
+
+const messageCache = new LRUCache({ maxSize: MESSAGE_CACHE_MAX_SIZE, ttl: MESSAGE_TTL_MS })
 
 function isMessageProcessed(msgId) {
   if (messageCache.has(msgId)) {
@@ -61,7 +64,7 @@ async function main() {
     const cleanupInterval = setInterval(() => {
       const stats = messageCache.cleanup()
       logger.debug({ ...stats }, 'Message cache cleanup completed')
-    }, MESSAGE_TTL)
+    }, MESSAGE_TTL_MS)
 
     let duplicateCount = 0
 
@@ -108,7 +111,7 @@ async function main() {
         },
         'Message processing statistics'
       )
-    }, 5 * 60 * 1000)
+    }, STATS_INTERVAL_MS)
 
     // Graceful shutdown handlers (best practice pattern)
     const shutdown = async (signal) => {

@@ -4,6 +4,7 @@ import { retryWithBackoff } from '../utils/retry.js'
 
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
+const DEFAULT_FLOOD_WAIT_SECONDS = 30
 
 export async function createSender(token, targets) {
   const bot = new Telegraf(token)
@@ -67,7 +68,7 @@ export async function createSender(token, targets) {
             typeof retryAfterParam === 'number' && retryAfterParam > 0 ? retryAfterParam : null
 
           if (!retryAfter && (err.response?.error_code === 429 || err.code === 429)) {
-            retryAfter = 30
+            retryAfter = DEFAULT_FLOOD_WAIT_SECONDS
           }
 
           if (retryAfter) {

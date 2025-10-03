@@ -7,6 +7,8 @@ import { NewMessage } from 'telegram/events/index.js'
 import { logger } from '../config.js'
 
 const SESSION_FILE = '.telegram-session'
+const CONNECTION_RETRIES = 5
+const CONNECTION_CHECK_INTERVAL_MS = 30000
 
 export async function createListener({ apiId, apiHash, phone, source, twoFactorPassword = '' }) {
   const emitter = new EventEmitter()
@@ -31,7 +33,7 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
   }
 
   const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
-    connectionRetries: 5
+    connectionRetries: CONNECTION_RETRIES
   })
 
   if (!session) {
@@ -137,7 +139,7 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
         clearInterval(checkConnection)
         process.exit(1)
       }
-    }, 30000) // Check every 30 seconds
+    }, CONNECTION_CHECK_INTERVAL_MS)
 
     emitter.once('stop', () => clearInterval(checkConnection))
   }

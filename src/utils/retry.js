@@ -3,8 +3,16 @@ import { logger, maskChatId } from '../config.js'
 const MAX_RETRIES = 4
 const BASE_DELAY_MS = 1000
 const MAX_RETRY_DELAY_SECONDS = 60
+const DEFAULT_RETRY_AFTER_SECONDS = 30
+const JITTER_MAX_MS = 1000
+const MS_PER_SECOND = 1000
 
-export async function retryWithBackoff({ fn, initialRetryAfter = 30, maxRetries = MAX_RETRIES, context = {} }) {
+export async function retryWithBackoff({
+  fn,
+  initialRetryAfter = DEFAULT_RETRY_AFTER_SECONDS,
+  maxRetries = MAX_RETRIES,
+  context = {}
+}) {
   let attempt = 0
   let retryAfter = Math.min(initialRetryAfter, MAX_RETRY_DELAY_SECONDS)
 
@@ -12,18 +20,18 @@ export async function retryWithBackoff({ fn, initialRetryAfter = 30, maxRetries 
     attempt++
 
     const backoffMs = BASE_DELAY_MS * Math.pow(2, attempt - 1)
-    const jitterMs = Math.random() * 1000
-    const delayMs = Math.max(retryAfter * 1000, backoffMs) + jitterMs
+    const jitterMs = Math.random() * JITTER_MAX_MS
+    const delayMs = Math.max(retryAfter * MS_PER_SECOND, backoffMs) + jitterMs
 
     logger.warn(
       {
         ...context,
         chatId: context.chatId ? maskChatId(context.chatId) : undefined,
         attempt,
-        delaySeconds: Math.round(delayMs / 1000),
+        delaySeconds: Math.round(delayMs / MS_PER_SECOND),
         initialRetryAfter
       },
-      `Rate limited, retry attempt ${attempt}/${maxRetries} after ${Math.round(delayMs / 1000)}s`
+      `Rate limited, retry attempt ${attempt}/${maxRetries} after ${Math.round(delayMs / MS_PER_SECOND)}s`
     )
 
     await new Promise((resolve) => setTimeout(resolve, delayMs))
@@ -35,7 +43,7 @@ export async function retryWithBackoff({ fn, initialRetryAfter = 30, maxRetries 
           ...context,
           chatId: context.chatId ? maskChatId(context.chatId) : undefined,
           attempt,
-          totalDelayMs: Math.round(delayMs / 1000)
+          totalDelayMs: Math.round(delayMs / MS_PER_SECOND)
         },
         `Operation succeeded after ${attempt} retries`
       )

@@ -33,8 +33,12 @@ function compileRegex(pattern, flags, name) {
   }
 }
 
+const BYTES_PER_KB = 1024
+const KB_PER_MB = 1024
+const DEFAULT_MAX_MEDIA_MB = 10
+
 function validateMaxMediaBytes(envValue) {
-  const defaultValue = 10 * 1024 * 1024
+  const defaultValue = DEFAULT_MAX_MEDIA_MB * KB_PER_MB * BYTES_PER_KB
 
   if (!envValue) return defaultValue
 

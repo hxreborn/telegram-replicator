@@ -1,10 +1,13 @@
+const DEFAULT_MAX_SIZE = 1000
+const DEFAULT_TTL_MS = 60 * 60 * 1000
+
 export class LRUCache {
   /**
    * @param {Object} options Configuration options
    * @param {number} options.maxSize Maximum number of entries (default: 1000)
    * @param {number} options.ttl Time-to-live in milliseconds (default: 3600000 = 1 hour)
    */
-  constructor({ maxSize = 1000, ttl = 60 * 60 * 1000 } = {}) {
+  constructor({ maxSize = DEFAULT_MAX_SIZE, ttl = DEFAULT_TTL_MS } = {}) {
     this.maxSize = maxSize
     this.ttl = ttl
     this.cache = new Map()
