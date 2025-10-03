@@ -1,72 +1,9 @@
 import { Telegraf } from 'telegraf'
 import { logger, maskChatId } from '../config.js'
+import { retryWithBackoff } from '../utils/retry.js'
 
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
-const MAX_RETRIES = 4
-const BASE_DELAY_MS = 1000
-
-/**
- * Retry with exponential backoff and jitter
- * @private
- */
-async function retryWithBackoff(initialRetryAfter, chatId, sourceId, sendToTarget) {
-  let attempt = 0
-  let retryAfter = Math.min(initialRetryAfter, 60) // Cap at 60 seconds
-
-  while (attempt < MAX_RETRIES) {
-    attempt++
-
-    const backoffMs = BASE_DELAY_MS * Math.pow(2, attempt - 1)
-    const jitterMs = Math.random() * 1000
-    const delayMs = Math.max(retryAfter * 1000, backoffMs) + jitterMs
-
-    logger.warn(
-      {
-        chatId: maskChatId(chatId),
-        attempt,
-        delaySeconds: Math.round(delayMs / 1000),
-        initialRetryAfter
-      },
-      `Rate limited, retry attempt ${attempt}/${MAX_RETRIES} after ${Math.round(delayMs / 1000)}s`
-    )
-
-    await new Promise((resolve) => setTimeout(resolve, delayMs))
-
-    try {
-      await sendToTarget()
-      logger.info(
-        {
-          chatId: maskChatId(chatId),
-          sourceId,
-          attempt,
-          totalDelayMs: Math.round(delayMs / 1000)
-        },
-        `Message sent (after ${attempt} retries)`
-      )
-      return
-    } catch (retryErr) {
-      const newRetryAfter =
-        retryErr.parameters?.retry_after ?? retryErr.response?.parameters?.retry_after
-
-      if (newRetryAfter && typeof newRetryAfter === 'number' && newRetryAfter > 0) {
-        retryAfter = Math.min(newRetryAfter, 60)
-      }
-
-      if (attempt === MAX_RETRIES) {
-        logger.error(
-          {
-            chatId: maskChatId(chatId),
-            sourceId,
-            err: retryErr,
-            totalAttempts: MAX_RETRIES
-          },
-          'Failed after all retry attempts'
-        )
-      }
-    }
-  }
-}
 
 /**
  * Creates a Telegraf bot sender that can send messages and media to multiple targets.
@@ -142,7 +79,15 @@ export async function createSender(token, targets) {
           }
 
           if (retryAfter) {
-            await retryWithBackoff(retryAfter, chatId, sourceId, sendToTarget)
+            try {
+              await retryWithBackoff({
+                fn: sendToTarget,
+                initialRetryAfter: retryAfter,
+                context: { chatId, sourceId }
+              })
+            } catch {
+              // All retries exhausted, already logged by retry utility
+            }
           } else {
             logger.error({ chatId: maskChatId(chatId), sourceId, err }, 'Failed to send message')
           }
