@@ -4,17 +4,6 @@ const MAX_RETRIES = 4
 const BASE_DELAY_MS = 1000
 const MAX_RETRY_DELAY_SECONDS = 60
 
-/**
- * Executes an async function with exponential backoff and jitter on failure.
- * Specifically designed for Telegram rate-limit handling.
- *
- * @param {Object} options Configuration options
- * @param {Function} options.fn Async function to execute
- * @param {number} [options.initialRetryAfter] Initial retry delay in seconds (from Telegram API)
- * @param {number} [options.maxRetries] Maximum retry attempts (default: 4)
- * @param {Object} [options.context] Logging context (chatId, sourceId, etc.)
- * @returns {Promise<void>}
- */
 export async function retryWithBackoff({ fn, initialRetryAfter = 30, maxRetries = MAX_RETRIES, context = {} }) {
   let attempt = 0
   let retryAfter = Math.min(initialRetryAfter, MAX_RETRY_DELAY_SECONDS)

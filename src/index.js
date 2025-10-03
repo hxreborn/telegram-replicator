@@ -4,15 +4,6 @@ import { createSender } from './bot/sender.js'
 import { filterMessage } from './bot/middleware/filter.js'
 import { LRUCache } from './utils/lru-cache.js'
 
-/**
- * Telegram Message Replicator
- *
- * Event-driven daemon that:
- * 1. Listens to messages from a source Telegram channel (via GramJS)
- * 2. Filters and transforms messages based on regex patterns
- * 3. Forwards filtered messages to multiple target chats (via Telegraf Bot API)
- */
-
 const MESSAGE_TTL = 60 * 60 * 1000 // 1 hour
 const messageCache = new LRUCache({ maxSize: 1000, ttl: MESSAGE_TTL })
 

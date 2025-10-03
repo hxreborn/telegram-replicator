@@ -8,18 +8,6 @@ import { logger } from '../config.js'
 
 const SESSION_FILE = '.telegram-session'
 
-/**
- * Creates a GramJS listener that emits 'message' events for messages from the source channel.
- * Returns an EventEmitter with additional methods: stop() and downloadMedia().
- *
- * @param {Object} options Configuration options
- * @param {number} options.apiId Telegram API ID
- * @param {string} options.apiHash Telegram API hash
- * @param {string} options.phone Phone number for authentication
- * @param {string} options.source Source channel username or ID
- * @param {string} [options.twoFactorPassword] Optional 2FA password
- * @returns {Promise<EventEmitter & { stop: Function, downloadMedia: Function }>}
- */
 export async function createListener({ apiId, apiHash, phone, source, twoFactorPassword = '' }) {
   const emitter = new EventEmitter()
 

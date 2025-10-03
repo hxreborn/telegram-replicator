@@ -5,14 +5,6 @@ import { retryWithBackoff } from '../utils/retry.js'
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
 
-/**
- * Creates a Telegraf bot sender that can send messages and media to multiple targets.
- * Handles text chunking, media upload caching, and flood-wait retries.
- *
- * @param {string} token Bot API token
- * @param {number[]} targets Array of target chat IDs
- * @returns {Promise<{ send: Function, stop: Function }>}
- */
 export async function createSender(token, targets) {
   const bot = new Telegraf(token)
 
@@ -159,11 +151,6 @@ async function sendCachedMedia(bot, chatId, fileId, type, caption) {
   }
 }
 
-/**
- * Splits text into chunks respecting word boundaries.
- * Falls back to force-break if no spaces found (handles URLs, base64, etc.)
- * @private
- */
 export function splitIntoChunks(text, limit) {
   const chunks = []
   let start = 0

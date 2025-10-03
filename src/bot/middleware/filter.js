@@ -1,16 +1,5 @@
 import { logger } from '../../config.js'
 
-/**
- * Filters and transforms a Telegram message.
- * Returns transformed message data or null if message should be dropped.
- *
- * @param {Object} msg GramJS message object
- * @param {Object} config Configuration object
- * @param {RegExp} config.filterRegex Regex to match (compiled)
- * @param {RegExp} config.stripRegex Regex to remove (compiled)
- * @param {number} config.maxMediaBytes Max media size in bytes
- * @returns {Object|null} Transformed message or null if filtered out
- */
 export function filterMessage(msg, config) {
   const text = extractText(msg)
   if (!text) {

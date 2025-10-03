@@ -2,11 +2,6 @@ import 'dotenv/config'
 import pino from 'pino'
 import caller from 'pino-caller'
 
-/**
- * Configuration and logger module.
- * Validates required environment variables and exports frozen config + logger.
- */
-
 const REQUIRED_VARS = {
   API_ID: 'Get from https://my.telegram.org/apps',
   API_HASH: 'Get from https://my.telegram.org/apps',
@@ -106,9 +101,6 @@ function parseTargets(targetsStr) {
   return ids
 }
 
-/**
- * Application configuration object (frozen for immutability)
- */
 const apiId = isTest ? 12345 : Number(process.env.API_ID)
 if (!isTest && (!Number.isInteger(apiId) || apiId <= 0)) {
   throw new Error(
@@ -153,9 +145,6 @@ export function maskChatId(chatId) {
   return idStr.length > 4 ? `...${idStr.slice(-4)}` : idStr
 }
 
-/**
- * Pino logger with caller information and pretty printing in development
- */
 const isDev = process.env.NODE_ENV === 'development'
 
 export const logger = caller(

@@ -1,9 +1,3 @@
-/**
- * Simple LRU (Least Recently Used) cache with TTL support.
- * No external dependencies - uses built-in Map for O(1) operations.
- *
- * @template T
- */
 export class LRUCache {
   /**
    * @param {Object} options Configuration options
