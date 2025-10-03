@@ -218,7 +218,7 @@ dist
 # Temporary files
 download-ripgrepja3o7f/
 
-# Documentation (exclude most markdown files)
+# Documentation
 *.md
 !README.md
 !LICENSE.md
