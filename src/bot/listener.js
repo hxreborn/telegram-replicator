@@ -157,9 +157,6 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
   logger.info('Listener ready')
 
   return Object.assign(emitter, {
-    /**
-     * Disconnects the Telegram client
-     */
     stop: async () => {
       logger.info('Stopping listener')
       emitter.emit('stop')

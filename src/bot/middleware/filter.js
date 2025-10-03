@@ -1,11 +1,6 @@
 import { logger } from '../../config.js'
 
 /**
- * Pure message filtering and transformation logic.
- * Extracts text, applies regex filters, strips footers, and escapes HTML.
- */
-
-/**
  * Filters and transforms a Telegram message.
  * Returns transformed message data or null if message should be dropped.
  *

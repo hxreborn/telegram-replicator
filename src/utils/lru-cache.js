@@ -16,11 +16,6 @@ export class LRUCache {
     this.cache = new Map()
   }
 
-  /**
-   * Adds an item to the cache
-   * @param {string|number} key Cache key
-   * @param {T} value Value to store
-   */
   set(key, value) {
     if (this.cache.has(key)) {
       this.cache.delete(key)
@@ -37,11 +32,6 @@ export class LRUCache {
     }
   }
 
-  /**
-   * Checks if a key exists in the cache (and hasn't expired)
-   * @param {string|number} key Cache key
-   * @returns {boolean}
-   */
   has(key) {
     const entry = this.cache.get(key)
     if (!entry) return false
@@ -55,11 +45,6 @@ export class LRUCache {
     return true
   }
 
-  /**
-   * Gets a value from the cache
-   * @param {string|number} key Cache key
-   * @returns {T|undefined}
-   */
   get(key) {
     const entry = this.cache.get(key)
     if (!entry) return undefined
@@ -76,10 +61,6 @@ export class LRUCache {
     return entry.value
   }
 
-  /**
-   * Removes expired entries from the cache
-   * @returns {Object} Cleanup statistics
-   */
   cleanup() {
     const now = Date.now()
     let cleanedUp = 0
@@ -98,17 +79,10 @@ export class LRUCache {
     }
   }
 
-  /**
-   * Current cache size
-   * @returns {number}
-   */
   get size() {
     return this.cache.size
   }
 
-  /**
-   * Clears all entries
-   */
   clear() {
     this.cache.clear()
   }

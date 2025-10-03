@@ -95,20 +95,12 @@ export async function createSender(token, targets) {
       }
     },
 
-    /**
-     * Stops the bot
-     * @param {string} signal Signal name for logging
-     */
     stop: (signal) => {
       logger.info({ signal }, 'Stopping sender bot')
     }
   }
 }
 
-/**
- * Sends media and returns file ID for caching
- * @private
- */
 async function sendMedia(bot, chatId, buffer, type, caption) {
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
 
@@ -151,10 +143,6 @@ async function sendMedia(bot, chatId, buffer, type, caption) {
   return null
 }
 
-/**
- * Sends media using cached file ID
- * @private
- */
 async function sendCachedMedia(bot, chatId, fileId, type, caption) {
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
 
