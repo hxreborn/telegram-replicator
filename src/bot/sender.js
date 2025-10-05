@@ -24,7 +24,7 @@ export async function createSender(token, targets) {
      * @param {string} data.text HTML-formatted text
      * @param {Buffer} [data.media] Media buffer
      * @param {string} [data.mediaType] 'photo' or 'document'
-     * @param {number} data.sourceId Original message ID for logging
+     * @param {string} data.sourceId Original message identifier for logging
      */
     async send({ text, media, mediaType, sourceId }) {
       let cachedFileId = null

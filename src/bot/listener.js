@@ -10,8 +10,18 @@ const SESSION_FILE = '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 
-export async function createListener({ apiId, apiHash, phone, source, twoFactorPassword = '' }) {
+export async function createListener({
+  apiId,
+  apiHash,
+  phone,
+  sources,
+  twoFactorPassword = ''
+}) {
   const emitter = new EventEmitter()
+
+  if (!Array.isArray(sources) || sources.length === 0) {
+    throw new Error('createListener requires at least one source channel')
+  }
 
   const sessionPath = path.resolve(SESSION_FILE)
   let session = ''
@@ -82,28 +92,58 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
   // Get dialogs to ensure connection is ready
   await client.getDialogs({ limit: 1 })
 
-  let channelId
-  try {
-    const entity = await client.getEntity(source)
-    channelId = BigInt(entity.id)
-    logger.info(
-      {
-        id: entity.id.toString(),
-        username: entity.username,
-        title: entity.title
-      },
-      'Source channel resolved'
-    )
-  } catch (err) {
-    const hint = source.startsWith('@')
-      ? `Ensure you're a member of ${source}, or use numeric ID (-100...)`
-      : `Ensure the numeric ID is correct and you're a member`
-    logger.error({ source, err }, 'Failed to resolve source channel')
-    throw new Error(
-      `Cannot find Telegram channel: ${source}\n` +
-        `  → ${hint}\n` +
-        `  → Original error: ${err.message}`
-    )
+  const channelMap = new Map()
+
+  for (const input of sources) {
+    try {
+      const entity = await client.getEntity(input)
+      const channelId = BigInt(entity.id)
+      const username = entity.username ? `@${entity.username}` : null
+      const label = username || entity.title || input
+
+      if (channelMap.has(channelId)) {
+        logger.warn(
+          {
+            channelId: channelId.toString(),
+            duplicatedInput: input,
+            existingInput: channelMap.get(channelId).input
+          },
+          'Duplicate source channel detected; reusing existing entry'
+        )
+        continue
+      }
+
+      const sourceInfo = {
+        id: channelId,
+        input,
+        label,
+        title: entity.title || null,
+        username: username
+      }
+
+      channelMap.set(channelId, sourceInfo)
+
+      logger.info(
+        {
+          id: channelId.toString(),
+          username: sourceInfo.username,
+          title: sourceInfo.title,
+          input
+        },
+        'Source channel resolved'
+      )
+    } catch (err) {
+      const startsWithAt = typeof input === 'string' && input.startsWith('@')
+      const hint = startsWithAt
+        ? `Ensure you're a member of ${input}, or use numeric ID (-100...)`
+        : `Ensure the numeric ID is correct and you're a member`
+      logger.error({ source: input, err }, 'Failed to resolve source channel')
+      throw new Error(
+        `Cannot find Telegram channel: ${input}\n` +
+          `  → ${hint}\n` +
+          `  → Original error: ${err.message}`
+      )
+    }
   }
 
   client.addEventHandler((event) => {
@@ -111,16 +151,33 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     if (!msg) return
 
     const msgChannelId = msg.peerId?.channelId
-    if (msgChannelId && BigInt(msgChannelId) === channelId) {
+    if (msgChannelId !== undefined && msgChannelId !== null) {
+      let lookupId
+      if (typeof msgChannelId === 'bigint') {
+        lookupId = msgChannelId
+      } else if (typeof msgChannelId === 'number') {
+        lookupId = BigInt(msgChannelId)
+      } else if (typeof msgChannelId === 'string') {
+        lookupId = BigInt(msgChannelId)
+      } else {
+        return
+      }
+
+      const sourceInfo = channelMap.get(lookupId)
+      if (!sourceInfo) {
+        return
+      }
+
       logger.debug(
         {
           msgId: msg.id,
           hasMedia: !!msg.media,
-          text: (msg.message || msg.caption || '').slice(0, 50)
+          text: (msg.message || msg.caption || '').slice(0, 50),
+          source: sourceInfo.label
         },
         'Message received from source'
       )
-      emitter.emit('message', msg)
+      emitter.emit('message', { message: msg, source: sourceInfo })
     }
   }, new NewMessage({}))
 
@@ -144,7 +201,7 @@ export async function createListener({ apiId, apiHash, phone, source, twoFactorP
     emitter.once('stop', () => clearInterval(checkConnection))
   }
 
-  logger.info('Listener ready')
+  logger.info({ sourceCount: channelMap.size }, 'Listener ready')
 
   return Object.assign(emitter, {
     stop: async () => {

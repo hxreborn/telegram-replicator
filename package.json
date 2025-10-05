@@ -1,7 +1,7 @@
 {
   "name": "telegram-message-replicator",
   "version": "1.0.0",
-  "description": "Simple event-driven message replicator for Telegram. Monitors one source channel, applies regex filters, broadcasts to multiple targets.",
+  "description": "Simple event-driven message replicator for Telegram. Monitors multiple source channels, applies regex filters, broadcasts to multiple targets.",
   "type": "module",
   "author": "hexpreso <32096750+hexpreso@users.noreply.github.com>",
   "license": "MIT",
