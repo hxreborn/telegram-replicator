@@ -25,31 +25,35 @@ GramJS Listener → Filter/Transform → Telegraf Sender
 2. **Filter** (`src/bot/middleware/filter.js`): Pure function that applies regex filtering, stripping, and HTML escaping
 3. **Sender** (`src/bot/sender.js`): Telegraf bot that broadcasts filtered messages to multiple targets with chunking and rate-limit handling
 
-The main orchestration is in `src/index.js`, which wires up the pipeline with message deduplication:
+The main orchestration is in `src/index.js`, which wires up the pipeline with monotonic message ID deduplication:
 
 ```javascript
-listener.on('message', async (msg) => {
-  // Check for duplicate messages (1-hour TTL cache)
-  if (isMessageProcessed(msg.id)) return;
+const lastMessageId = new Map()
+
+listener.on('message', async ({ message: msg, source }) => {
+  // Skip duplicate/replayed messages (Telegram IDs are strictly increasing)
+  const lastSeen = lastMessageId.get(source.id)
+  if (lastSeen !== undefined && msg.id <= lastSeen) return;
 
   const filtered = filterMessage(msg, config);
   if (!filtered) return;
   const mediaBuffer = await listener.downloadMedia(msg);
   await sender.send({ text, media, mediaType });
+
+  lastMessageId.set(source.id, msg.id)
 });
 ```
 
 **Message Deduplication** (`src/index.js`):
-- Uses LRU cache (`src/utils/lru-cache.js`) for processed message IDs
-- 1-hour TTL with automatic cleanup and size limit (1000 entries)
-- Prevents duplicate processing of the same message
-- Logs duplicate count for monitoring
+- Tracks last seen message ID per source channel in a `Map<sourceId, lastMessageId>`
+- Drops messages where `newId <= lastSeen` (leverages Telegram's monotonic message IDs)
+- Prevents MTProto retry bursts from duplicating messages to targets
+- Minimal overhead (~7 lines, no timers or cleanup needed)
 
 ### Key Components
 
 **Utilities** (`src/utils/`):
 - `retry.js`: Reusable exponential backoff retry logic with jitter for rate-limit handling
-- `lru-cache.js`: Simple LRU cache with TTL support for message deduplication (no external dependencies)
 
 **Configuration** (`src/config.js`):
 - Validates environment variables at startup
@@ -106,7 +110,7 @@ listener.on('message', async (msg) => {
 - Media-only messages (no text/caption) are dropped - filter requires text to match against
 - Edits to source messages are ignored - only new messages trigger replication
 - Message order is not guaranteed when rate-limited - targets may receive messages in different orders
-- Duplicate messages automatically filtered using 1-hour TTL cache
+- Duplicate/replayed messages filtered using monotonic message ID tracking per source (prevents MTProto retry bursts)
 
 **Environment & Deployment**:
 - Exits on disconnect for clean restart (use PM2/systemd for auto-restart)
@@ -137,7 +141,7 @@ listener.on('message', async (msg) => {
 3. Keep commits focused - one refactoring concept per commit
 4. Prefer extracting functions over adding complexity
 
-IMPORTANT: This is a minimal, dependency-light project (~550 lines). When adding features, prefer built-in Node.js APIs over npm packages. Question whether the feature aligns with the project's "simple event-driven replicator" philosophy.
+IMPORTANT: This is a minimal, dependency-light project (~665 lines). When adding features, prefer built-in Node.js APIs over npm packages. Question whether the feature aligns with the project's "simple event-driven replicator" philosophy.
 
 ## API Gotchas & Best Practices
 
@@ -259,10 +263,10 @@ IMPORTANT: **Never commit sensitive files**
 - Both are in `.gitignore` - verify before every commit
 
 IMPORTANT: **Maintain the minimal philosophy**
-- This project is intentionally simple (~550 lines total)
+- This project is intentionally simple (~665 lines total)
 - Don't add features that bloat the codebase
 - Question every new dependency
-- Extract utilities when code is reusable (retry, cache)
+- Extract utilities when code is reusable (e.g., retry logic)
 - If a feature needs >100 lines, reconsider the approach
 
 YOU MUST: **Run tests before marking tasks complete**

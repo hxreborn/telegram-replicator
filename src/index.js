@@ -46,8 +46,16 @@ async function main() {
       'Filters configured'
     )
 
+    const lastMessageId = new Map()
+
     listener.on('message', async ({ message: msg, source }) => {
       try {
+        const lastSeen = lastMessageId.get(source.id)
+        if (lastSeen !== undefined && msg.id <= lastSeen) {
+          logger.debug({ msgId: msg.id, source: source.label, lastSeen }, 'Duplicate message')
+          return
+        }
+
         const filtered = filterMessage(msg, config)
         if (!filtered) return
 
@@ -66,6 +74,8 @@ async function main() {
           mediaType: filtered.mediaType,
           sourceId: `${source.label}#${filtered.sourceId}`
         })
+
+        lastMessageId.set(source.id, msg.id)
       } catch (err) {
         logger.error({ err, msgId: msg?.id }, 'Error processing message')
       }
