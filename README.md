@@ -83,7 +83,7 @@ Regex compiled at startup. Test patterns at regex101.com (JavaScript flavor).
 ## Limitations
 
 - No auto-reconnect on disconnect (use process manager: systemd/pm2)
-- **Duplicate messages may occur** during network retries or process restarts (Telegram's MTProto can replay updates when reconnecting)
+- **Duplicate messages may occur** during network retries or process restarts (Telegram's MTProto can replay updates when reconnecting); the app only suppresses immediate replays within the same run
 - Voice messages require adding 'voice' to `SUPPORTED_MEDIA_TYPES`
 - Stickers and polls not supported
 - 2FA support requires setting `TG_2FA_PASSWORD` or responding to the interactive prompt on first run

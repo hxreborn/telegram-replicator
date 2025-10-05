@@ -29,11 +29,11 @@
 | **Edit events** | Medium | N/A | Edits arrive on a different update type that we ignore. |
 | **Process restarts** | Guaranteed | Duplicate after restart | Cache can’t help; it starts empty. |
 
-**Inference:** The LRU defends mainly against MTProto retry bursts. For the typical replicator (stable network, single process), this is a rare edge case.
+**Inference:** Any guard (map, LRU, etc.) mainly protects against MTProto retry bursts. For the typical replicator (stable network, single process), this is a rare edge case.
 
 ---
 
-## 3. Cost of Keeping the LRU (Why “Over-Engineering” Feels Real)
+## 3. Cost of the Old LRU (Why “Over-Engineering” Felt Real)
 
 | Cost Surface | Today’s Reality | Opportunity if removed/simplified |
 | --- | --- | --- |
@@ -43,7 +43,7 @@
 | **Performance** | Micro hit per message (Map operations) + cleanup loops | Slight CPU drop; deterministic behaviour |
 | **Bug surface** | TTL bugs, memory growth, inconsistent stats | Hard to misconfigure if the feature doesn’t exist |
 
-The LRU made sense when we only watched one channel and didn’t want to flood from network hiccups. With multi-source support and a “simple by default” philosophy, the weight is more obvious.
+That LRU made sense when we only watched one channel and didn’t want to flood from network hiccups. With multi-source support and a “simple by default” philosophy, the weight became obvious—hence the pivot to the lean map guard.
 
 ---
 
@@ -63,11 +63,11 @@ No other catastrophic effects. There’s no risk of data loss, security issues, 
 
 | Option | Mechanics | Pros | Cons |
 | --- | --- | --- | --- |
-| **A. Kill dedupe entirely** | Delete `LRUCache` usage and timers | Absolute simplicity | Rare duplicate bursts might leak through |
-| **B. Last-ID per source (monotonic guard)** | `Map<sourceId, lastMessageId>`; drop `newId <= seenId` | 5–10 LOC, no timers, respects monotonic message IDs | Doesn’t catch replays that jump *forward* in ID (theoretical) |
-| **C. Sliding window set** | Keep small `Set` of recent IDs per source (size ~10) | Still small, stops immediate replays | Slightly more state, but trivial |
+| **A. Kill dedupe entirely (pure KISS)** | Remove the guard and let every message through | Absolute simplicity | Rare duplicate bursts might leak through |
+| **B. Keep the last-ID guard (current state)** | `Map<sourceId, lastMessageId>`; drop `newId <= seenId` | 5–10 LOC, no timers, respects monotonic message IDs | Doesn’t catch replays that jump *forward* in ID (theoretical) |
+| **C. Reintroduce a sliding window/LRU** | Remember a short window of IDs per source | Strongest defence against bizarre replays | Brings back cleanup, tuning, and extra moving parts |
 
-**Telegram fact check:** Message IDs inside a channel are strictly increasing integers. Even album parts increase monotonically. Therefore, Option B is safe for the current use cases.
+**Telegram fact check:** Message IDs inside a channel are strictly increasing integers. Even album parts increase monotonically. Therefore, Option B—the approach we use today—is safe for the current use cases.
 
 ---
 
@@ -76,25 +76,25 @@ No other catastrophic effects. There’s no risk of data loss, security issues, 
 Even when we trust theory, it’s smart to gather *our* evidence:
 
 ### Phase 1 – Instrument (0.5 day)
-- Add an env flag `DEDUP_TRACE=true` that logs `sourceId`, `msgId`, and whether the cache blocked it (without changing behaviour yet).
+- Add an env flag `DEDUP_TRACE=true` that logs `sourceId`, `msgId`, and whether the guard blocked it (without changing behaviour yet).
 - Deploy to staging or run locally with `LOG_LEVEL=debug` and record logs for a few hours of normal traffic.
 
 ### Phase 2 – Shadow Run (1–3 days)
-- Add a second env flag `DEDUP_BYPASS=true` that skips the LRU write but still logs would-be deduped keys.
+- Add a second env flag `DEDUP_BYPASS=true` that skips updating the map but still logs would-be suppressed keys.
 - Observe log patterns. If duplicates appear, capture:
   - Time delta between repeats
   - Whether the client was reconnecting (`GramJS` debug logs can show) or network issues exist
   - Downstream reaction (if any)
 
 ### Phase 3 – Evaluate Outcomes
-- **No duplicates seen:** green-light Option A removal (fully delete dedupe) or Option B (minimal `Map` guard) depending on appetite for zero defense.
-- **Occasional duplicates (e.g., 1/day):** decide if downstream can stomach them. If not, adopt Option B for cheap insurance.
-- **Frequent duplicates:** keep the LRU or refactor to Option C (sliding window) if the LRU overhead itself is problematic.
+- **No duplicates seen:** consider Option A (pure simplicity) or keep Option B if you like the low-cost safety net.
+- **Occasional duplicates (e.g., 1/day):** decide if downstream can stomach them. If not, stay with Option B.
+- **Frequent duplicates:** move to Option C if the map proves insufficient.
 
 ### Phase 4 – Implement & Cleanup
-- Remove `LRUCache` import, object, and timers if going with Option A/B.
-- Option B: introduce `const lastSeen = new Map()` and replace `isMessageProcessed` call with monotonic check.
-- Prune documentation, tests, and logging accordingly.
+- Option A: remove the map, related logs, and docs describing dedupe.
+- Option B: keep the map (what we ship today) and ensure docs reflect the behaviour.
+- Option C: design a small sliding window or resurrect the LRU utility, then document the extra maintenance.
 
 ### Phase 5 – Monitor (1–2 weeks)
 - After the change, watch for user complaints, and optionally add a lightweight `duplicateSuspect` counter when `msgId <= lastSeen` (only for Option B/C).
@@ -103,8 +103,8 @@ Even when we trust theory, it’s smart to gather *our* evidence:
 
 ## 7. Recommendation Snapshot
 
-1. **Default stance:** aim to remove the LRU (Option A) unless real traffic proves we need it.
-2. **Safety net:** if duplicates are intolerable *and* observed, adopt Option B (monotonic guard). It is simple, deterministic, and aligns with the “no over-engineering” principle.
+1. **Default stance:** keep the current Option B guard—it delivers simplicity with a bit of safety.
+2. **Safety net:** if duplicates are negligible, Option A is viable; if they hurt, be ready to escalate to Option C.
 3. **Document the residual risk:** whichever path chosen, record in README that duplicates may occur after restarts or network retries so operators know what to expect.
 
 ---
@@ -123,7 +123,7 @@ Even when we trust theory, it’s smart to gather *our* evidence:
 
 - **Is dedupe strictly necessary?** No. It mitigates a rare class of retries but doesn’t guarantee uniqueness, especially across restarts.
 - **What happens if we remove it?** Worst-case: occasional duplicate posts during transient network hiccups. For most channels, acceptable. For strict ones, use a tiny last-ID guard instead of the heavyweight LRU.
-- **What’s the simplest sustainable setup?** Delete the LRU, optionally keep a per-source last-ID map, and document the trade-off. Gather empirical evidence before/after to reassure stakeholders.
+- **What’s the simplest sustainable setup?** Stick with the per-source last-ID map by default; drop it only if duplicates are acceptable.
 
 ---
 
