@@ -126,8 +126,9 @@ if (!isTest && (!Number.isInteger(apiId) || apiId <= 0)) {
   )
 }
 
-const sourcesInput = isTest ? ['@test-channel'] : parseSources(process.env.TG_SOURCE_CHANNEL)
-const sources = Object.freeze([...sourcesInput])
+const sources = Object.freeze(
+  isTest ? ['@test-channel'] : parseSources(process.env.TG_SOURCE_CHANNEL)
+)
 
 export const config = Object.freeze({
   apiId,

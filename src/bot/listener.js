@@ -106,32 +106,28 @@ export async function createListener({
           {
             channelId: channelId.toString(),
             duplicatedInput: input,
-            existingInput: channelMap.get(channelId).input
+            existingLabel: channelMap.get(channelId).label
           },
           'Duplicate source channel detected; reusing existing entry'
         )
         continue
       }
 
-      const sourceInfo = {
-        id: channelId,
-        input,
-        label,
-        title: entity.title || null,
-        username: username
-      }
-
-      channelMap.set(channelId, sourceInfo)
-
       logger.info(
         {
           id: channelId.toString(),
-          username: sourceInfo.username,
-          title: sourceInfo.title,
+          username,
+          title: entity.title || null,
           input
         },
         'Source channel resolved'
       )
+
+      channelMap.set(channelId, {
+        id: channelId,
+        input,
+        label
+      })
     } catch (err) {
       const startsWithAt = typeof input === 'string' && input.startsWith('@')
       const hint = startsWithAt
