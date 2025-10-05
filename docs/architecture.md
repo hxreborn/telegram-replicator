@@ -4,11 +4,10 @@
 
 ```
 src/
-├── index.js                    # Main orchestrator (~90 lines)
+├── index.js                    # Main orchestrator (~70 lines)
 ├── config.js                   # Config + logger (~115 lines)
 ├── utils/
-│   ├── retry.js                # Exponential backoff utility (~70 lines)
-│   └── lru-cache.js            # LRU cache with TTL (~85 lines)
+│   └── retry.js                # Exponential backoff utility (~70 lines)
 └── bot/
     ├── listener.js             # GramJS EventEmitter wrapper (~175 lines)
     ├── sender.js               # Telegraf wrapper (~155 lines)
@@ -16,7 +15,7 @@ src/
         └── filter.js           # Message filtering logic (~80 lines)
 ```
 
-**Total: 7 files, ~770 lines** (includes utilities, resilience features)
+**Total: 6 files, ~665 lines** (includes utilities, resilience features)
 
 ### Data Flow
 
@@ -35,14 +34,9 @@ src/
 - Handles Telegram rate limits (FLOOD_WAIT)
 - 4 max retries, capped at 60s delay
 
-**[src/utils/lru-cache.js](../src/utils/lru-cache.js)** - LRU Cache
-- Simple LRU cache with TTL support
-- Used for message deduplication
-- No external dependencies
-
 **[src/index.js](../src/index.js)** - Orchestrator
 - Initializes listener and sender
-- Wires up event pipeline with LRU cache deduplication
+- Wires up event pipeline
 - Handles graceful shutdown with `SIGINT`/`SIGTERM`
 
 **[src/config.js](../src/config.js)** - Configuration + Logger
@@ -52,6 +46,7 @@ src/
 
 **[src/bot/listener.js](../src/bot/listener.js)** - GramJS Wrapper
 - Returns EventEmitter that emits `'message'` events
+- Resolves multiple source channels and tags each event with its origin
 - Handles session management (`.telegram-session` file)
 - Disconnect handler: exits on connection loss (PM2 restarts)
 - Connection health check every 30 seconds

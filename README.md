@@ -1,18 +1,18 @@
 # telegram-replicator
 
-Simple event-driven message replicator for Telegram. Monitors one source channel, applies regex filters, broadcasts to multiple targets.
+Simple event-driven message replicator for Telegram. Monitors one or many source channels, applies regex filters, broadcasts to multiple targets.
 
 ## How it works
 
-GramJS (user client) listens to source channel → regex filter → Telegraf (bot) broadcasts to N targets. Handles media (photos/documents/videos/audio <10MB by default), text chunking (Telegram limits), HTML escaping, message deduplication, exponential backoff for rate limits, graceful shutdown.
+GramJS (user client) listens to source channel(s) → regex filter → Telegraf (bot) broadcasts to N targets. Handles media (photos/documents/videos/audio <10MB by default), text chunking (Telegram limits), HTML escaping, exponential backoff for rate limits, graceful shutdown.
 
 ```
-Source → Filter (regex) → Strip (regex) → Deduplicate → Broadcast to targets
-           ↓                                   ↓
-    Download media if present          Cache with 1hr TTL
+Source → Filter (regex) → Strip (regex) → Broadcast to targets
+           ↓
+    Download media if present
 ```
 
-~1000 lines total. No DB, no external deps beyond Telegram clients.
+~665 lines total. No DB, no external deps beyond Telegram clients.
 
 ## Setup
 
@@ -40,7 +40,7 @@ API_ID=12345678
 API_HASH=abcdef...
 PHONE_NUMBER=+1234567890
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TG_SOURCE_CHANNEL=@channelname          # or -1001234567890
+TG_SOURCE_CHANNEL=@channel1,@channel2   # or -1001234567890
 TG_TARGETS=-1001234567890,-1009876543210
 
 # Optional filtering (defaults shown)
@@ -55,6 +55,8 @@ MAX_MEDIA_BYTES=10485760                               # 10MB default
 # System
 LOG_LEVEL=info            # debug|info|warn|error
 ```
+
+`TG_SOURCE_CHANNEL` accepts comma-separated usernames or numeric IDs. Order is preserved.
 
 Regex compiled at startup. Test patterns at regex101.com (JavaScript flavor).
 
@@ -72,7 +74,7 @@ Regex compiled at startup. Test patterns at regex101.com (JavaScript flavor).
 
 ## Features
 
-- **Message Deduplication**: Automatically filters duplicate messages using a 1-hour TTL cache
+- **Multi-source Support**: Listen to multiple channels or groups with a single replicator instance
 - **Smart Rate Limiting**: Exponential backoff with jitter for handling Telegram rate limits
 - **Configurable Media Types**: Support for photos, documents, videos, and audio (configurable via `SUPPORTED_MEDIA_TYPES`)
 - **Text Chunking**: Automatically splits long messages respecting word boundaries
@@ -81,6 +83,7 @@ Regex compiled at startup. Test patterns at regex101.com (JavaScript flavor).
 ## Limitations
 
 - No auto-reconnect on disconnect (use process manager: systemd/pm2)
+- **Duplicate messages may occur** during network retries or process restarts (Telegram's MTProto can replay updates when reconnecting)
 - Voice messages require adding 'voice' to `SUPPORTED_MEDIA_TYPES`
 - Stickers and polls not supported
 - 2FA support requires setting `TG_2FA_PASSWORD` or responding to the interactive prompt on first run
