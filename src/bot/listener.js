@@ -144,7 +144,20 @@ export async function createListener({
 
   client.addEventHandler((event) => {
     const msg = event.message
-    if (!msg) return
+    if (!msg) {
+      logger.debug({ event: event.className }, 'Event received without message')
+      return
+    }
+
+    logger.debug(
+      {
+        msgId: msg.id,
+        peerId: msg.peerId,
+        channelId: msg.peerId?.channelId,
+        channelIdType: typeof msg.peerId?.channelId
+      },
+      'Raw event received'
+    )
 
     const msgChannelId = msg.peerId?.channelId
     if (msgChannelId !== undefined && msgChannelId !== null) {
@@ -155,7 +168,11 @@ export async function createListener({
         lookupId = BigInt(msgChannelId)
       } else if (typeof msgChannelId === 'string') {
         lookupId = BigInt(msgChannelId)
+      } else if (typeof msgChannelId === 'object') {
+        // GramJS sometimes returns channelId as an object with toString()
+        lookupId = BigInt(msgChannelId.toString())
       } else {
+        logger.debug({ msgChannelId, type: typeof msgChannelId }, 'Unknown channelId type')
         return
       }
 

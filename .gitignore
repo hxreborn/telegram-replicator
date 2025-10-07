@@ -214,6 +214,8 @@ dist
 # IDE / Tool specific
 .mcp
 .claude/
+# opencode artifacts
+.opencode/
 
 # Temporary files
 download-ripgrepja3o7f/
