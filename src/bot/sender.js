@@ -1,20 +1,27 @@
 import { Telegraf } from 'telegraf'
 import { logger, maskChatId } from '../config.js'
 import { retryWithBackoff } from '../utils/retry.js'
+import { createTelegrafAdapter } from './telegraf-adapter.js'
 
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
 const DEFAULT_FLOOD_WAIT_SECONDS = 30
 
-export async function createSender(token, targets) {
+export async function createSender(
+  token,
+  targets,
+  { adapterFactory = createTelegrafAdapter } = {}
+) {
   const bot = new Telegraf(token)
 
   bot.catch((err) => logger.error({ err }, 'Uncaught bot error'))
 
-  await bot.telegram.deleteWebhook({ drop_pending_updates: true })
+  const adapter = adapterFactory(bot)
+
+  await adapter.deleteWebhook({ drop_pending_updates: true })
   logger.debug('Webhook cleared')
 
-  const info = await bot.telegram.getMe()
+  const info = await adapter.getMe()
   logger.info({ username: info.username }, 'Sender bot ready')
 
   return {
@@ -40,19 +47,19 @@ export async function createSender(token, targets) {
                 : []
 
             if (!cachedFileId) {
-              const result = await sendMedia(bot, chatId, media, mediaType, caption)
+              const result = await sendMedia(adapter, chatId, media, mediaType, caption)
               cachedFileId = result
             } else {
-              await sendCachedMedia(bot, chatId, cachedFileId, mediaType, caption)
+              await sendCachedMedia(adapter, chatId, cachedFileId, mediaType, caption)
             }
 
             for (const chunk of bodyChunks) {
-              await bot.telegram.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
+              await adapter.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
             }
           } else {
             const chunks = splitIntoChunks(text, MESSAGE_LIMIT)
             for (const chunk of chunks) {
-              await bot.telegram.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
+              await adapter.sendMessage(chatId, chunk, { parse_mode: 'HTML' })
             }
           }
         }
@@ -94,39 +101,39 @@ export async function createSender(token, targets) {
   }
 }
 
-async function sendMedia(bot, chatId, buffer, type, caption) {
+async function sendMedia(adapter, chatId, buffer, type, caption) {
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
 
   if (type === 'photo') {
-    const result = await bot.telegram.sendPhoto(
+    const result = await adapter.sendPhoto(
       chatId,
       { source: buffer, filename: 'photo.jpg' },
       options
     )
     return result.photo?.at(-1)?.file_id
   } else if (type === 'video') {
-    const result = await bot.telegram.sendVideo(
+    const result = await adapter.sendVideo(
       chatId,
       { source: buffer, filename: 'video.mp4' },
       options
     )
     return result.video?.file_id
   } else if (type === 'audio') {
-    const result = await bot.telegram.sendAudio(
+    const result = await adapter.sendAudio(
       chatId,
       { source: buffer, filename: 'audio.mp3' },
       options
     )
     return result.audio?.file_id
   } else if (type === 'voice') {
-    const result = await bot.telegram.sendVoice(
+    const result = await adapter.sendVoice(
       chatId,
       { source: buffer, filename: 'voice.ogg' },
       options
     )
     return result.voice?.file_id
   } else if (type === 'document') {
-    const result = await bot.telegram.sendDocument(
+    const result = await adapter.sendDocument(
       chatId,
       { source: buffer, filename: 'file.bin' },
       options
@@ -136,19 +143,19 @@ async function sendMedia(bot, chatId, buffer, type, caption) {
   return null
 }
 
-async function sendCachedMedia(bot, chatId, fileId, type, caption) {
+async function sendCachedMedia(adapter, chatId, fileId, type, caption) {
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
 
   if (type === 'photo') {
-    await bot.telegram.sendPhoto(chatId, fileId, options)
+    await adapter.sendPhoto(chatId, fileId, options)
   } else if (type === 'video') {
-    await bot.telegram.sendVideo(chatId, fileId, options)
+    await adapter.sendVideo(chatId, fileId, options)
   } else if (type === 'audio') {
-    await bot.telegram.sendAudio(chatId, fileId, options)
+    await adapter.sendAudio(chatId, fileId, options)
   } else if (type === 'voice') {
-    await bot.telegram.sendVoice(chatId, fileId, options)
+    await adapter.sendVoice(chatId, fileId, options)
   } else if (type === 'document') {
-    await bot.telegram.sendDocument(chatId, fileId, options)
+    await adapter.sendDocument(chatId, fileId, options)
   }
 }
 
