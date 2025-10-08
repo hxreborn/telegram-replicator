@@ -6,13 +6,18 @@ const MAX_RETRY_DELAY_SECONDS = 60
 const DEFAULT_RETRY_AFTER_SECONDS = 30
 const JITTER_MAX_MS = 1000
 const MS_PER_SECOND = 1000
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function retryWithBackoff({
   fn,
   initialRetryAfter = DEFAULT_RETRY_AFTER_SECONDS,
   maxRetries = MAX_RETRIES,
-  context = {}
+  context = {},
+  sleep = defaultSleep,
+  random = Math.random,
+  logger: overrideLogger
 }) {
+  const log = overrideLogger ?? logger
   let attempt = 0
   let retryAfter = Math.min(initialRetryAfter, MAX_RETRY_DELAY_SECONDS)
 
@@ -20,10 +25,10 @@ export async function retryWithBackoff({
     attempt++
 
     const backoffMs = BASE_DELAY_MS * Math.pow(2, attempt - 1)
-    const jitterMs = Math.random() * JITTER_MAX_MS
+    const jitterMs = Math.max(0, Math.min(1, random())) * JITTER_MAX_MS
     const delayMs = Math.max(retryAfter * MS_PER_SECOND, backoffMs) + jitterMs
 
-    logger.warn(
+    log.warn(
       {
         ...context,
         chatId: context.chatId ? maskChatId(context.chatId) : undefined,
@@ -34,11 +39,11 @@ export async function retryWithBackoff({
       `Rate limited, retry attempt ${attempt}/${maxRetries} after ${Math.round(delayMs / MS_PER_SECOND)}s`
     )
 
-    await new Promise((resolve) => setTimeout(resolve, delayMs))
+    await sleep(delayMs)
 
     try {
       await fn()
-      logger.info(
+      log.info(
         {
           ...context,
           chatId: context.chatId ? maskChatId(context.chatId) : undefined,
@@ -57,7 +62,7 @@ export async function retryWithBackoff({
       }
 
       if (attempt === maxRetries) {
-        logger.error(
+        log.error(
           {
             ...context,
             chatId: context.chatId ? maskChatId(context.chatId) : undefined,
