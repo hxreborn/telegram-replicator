@@ -173,9 +173,27 @@ export function maskChatId(chatId) {
 
 const isDev = process.env.NODE_ENV === 'development'
 
+const SENSITIVE_LOG_PATHS = Object.freeze([
+  'botToken',
+  'apiHash',
+  'phone',
+  'twoFactorPassword',
+  'TG_2FA_PASSWORD',
+  'headers.authorization',
+  'request.headers.authorization',
+  'response.config.headers.authorization',
+  'err.config.headers.authorization',
+  'err.request.headers.authorization',
+  'err.response.config.headers.authorization'
+])
+
 export const logger = caller(
   pino({
     level: config.logLevel,
+    redact: {
+      paths: SENSITIVE_LOG_PATHS,
+      remove: true
+    },
     ...(isDev && {
       transport: {
         target: 'pino-pretty',
