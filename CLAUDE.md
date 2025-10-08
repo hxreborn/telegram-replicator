@@ -75,7 +75,7 @@ Event-driven pipeline: `GramJS Listener → Filter → Telegraf Sender`
 
 **New Features:** Research patterns → TDD → minimal impl → verify alignment with "simple replicator" philosophy
 
-**Dependencies:** Prefer Node.js built-in APIs over npm packages (~1200 LoC project)
+**Dependencies:** Prefer Node.js built-in APIs over npm packages - keep it minimal
 
 ## Git
 
@@ -92,6 +92,6 @@ Event-driven pipeline: `GramJS Listener → Filter → Telegraf Sender`
 
 ⚠️ **NEVER commit `.env` or `.telegram-session`** (plaintext secrets)
 
-⚠️ **Keep it minimal** (~1200 LoC) - question new deps, prefer Node.js built-ins
+⚠️ **Keep it minimal** - question new deps, prefer Node.js built-ins
 
 ⚠️ **Tests must pass** before marking todos complete
