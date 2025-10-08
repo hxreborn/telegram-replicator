@@ -26,7 +26,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "deploy": "bash deploy.sh"
   },
   "dependencies": {
     "dotenv": "^16.5.0",
