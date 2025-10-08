@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "description": "Simple event-driven message replicator for Telegram. Monitors multiple source channels, applies regex filters, broadcasts to multiple targets.",
   "type": "module",
-  "author": "hexpreso <32096750+hexpreso@users.noreply.github.com>",
+  "author": "hxreborn <32096750+hxreborn@users.noreply.github.com>",
   "license": "MIT",
+  "homepage": "https://github.com/hxreborn/telegram-replicator#readme",
+  "bugs": {
+    "url": "https://github.com/hxreborn/telegram-replicator/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hexpreso/telegram-replicator.git"
+    "url": "git+https://github.com/hxreborn/telegram-replicator.git"
   },
   "keywords": [
     "telegram",
@@ -18,16 +22,30 @@
     "telegraf"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   },
+  "main": "src/index.js",
+  "files": [
+    "src/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node src/index.js",
-    "test": "NODE_ENV=test node --test",
+    "dev": "NODE_ENV=development node src/index.js",
+    "test": "NODE_ENV=test jest",
+    "test:watch": "NODE_ENV=test jest --watch",
+    "test:coverage": "NODE_ENV=test jest --coverage",
+    "test:integration": "NODE_ENV=test RUN_TELEGRAM_INTEGRATION=1 jest --runTestsByPath tests/integration/bot/sender.integration.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "deploy": "bash deploy.sh"
+    "deploy": "bash deploy.sh",
+    "clean": "rm -rf node_modules package-lock.json",
+    "postinstall": "echo 'Run npm start to begin'"
   },
   "dependencies": {
     "dotenv": "^16.5.0",
@@ -38,9 +56,12 @@
     "telegram": "^2.26.22"
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.26.0",
     "@eslint/js": "^9.36.0",
+    "babel-jest": "^29.7.0",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^9.1.2",
+    "jest": "^29.7.0",
     "prettier": "^3.6.2"
   }
 }
