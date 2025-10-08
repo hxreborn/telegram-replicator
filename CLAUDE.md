@@ -63,10 +63,10 @@ Event-driven pipeline: `GramJS Listener → Filter → Telegraf Sender`
 
 ## Testing
 
-- Node.js built-in runner (`node:test` + `node:assert/strict`)
-- Test pure functions with real data - NO mocks
-- TDD: write tests first
-- Co-located: `filter.test.js` next to `filter.js`
+- Jest (`@jest/globals`) + `node:assert/strict`
+- Prefer real data over mocks; use shared doubles in `tests/helpers/`
+- TDD: write failing test, implement, refactor
+- Tests live under `tests/unit`, `tests/integration`, `tests/contract`
 - **Must pass before commit**
 
 ## Workflow
