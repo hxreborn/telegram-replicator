@@ -10,13 +10,7 @@ const SESSION_FILE = '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 
-export async function createListener({
-  apiId,
-  apiHash,
-  phone,
-  sources,
-  twoFactorPassword = ''
-}) {
+export async function createListener({ apiId, apiHash, phone, sources, twoFactorPassword = '' }) {
   const emitter = new EventEmitter()
 
   if (!Array.isArray(sources) || sources.length === 0) {

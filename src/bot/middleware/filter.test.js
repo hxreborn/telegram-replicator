@@ -2,7 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { filterMessage } from './filter.js'
 
-
 const mockConfig = {
   filterRegex: /tech|update/i,
   stripRegex: /Powered by.*$/gi,

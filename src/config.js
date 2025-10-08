@@ -7,7 +7,8 @@ const REQUIRED_VARS = {
   API_HASH: 'Get from https://my.telegram.org/apps',
   PHONE_NUMBER: 'User account phone in E.164 format (e.g., +1234567890)',
   TELEGRAM_BOT_TOKEN: 'Get from @BotFather on Telegram',
-  TG_SOURCE_CHANNEL: 'Channel usernames (comma-separated, e.g., @channel1,@channel2) or numeric IDs',
+  TG_SOURCE_CHANNEL:
+    'Channel usernames (comma-separated, e.g., @channel1,@channel2) or numeric IDs',
   TG_TARGETS: 'Comma-separated chat IDs (e.g., -1001234567890,-1009876543210)'
 }
 
@@ -83,7 +84,9 @@ function parseSources(sourceStr) {
     .filter((value) => value.length > 0)
 
   if (sources.length === 0) {
-    throw new Error('TG_SOURCE_CHANNEL cannot be empty\n  → Provide at least one channel username or numeric ID')
+    throw new Error(
+      'TG_SOURCE_CHANNEL cannot be empty\n  → Provide at least one channel username or numeric ID'
+    )
   }
 
   return sources

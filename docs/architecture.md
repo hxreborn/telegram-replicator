@@ -30,21 +30,25 @@ src/
 ### Key Components
 
 **[src/utils/retry.js](../src/utils/retry.js)** - Retry Utility
+
 - Reusable exponential backoff with jitter
 - Handles Telegram rate limits (FLOOD_WAIT)
 - 4 max retries, capped at 60s delay
 
 **[src/index.js](../src/index.js)** - Orchestrator
+
 - Initializes listener and sender
 - Wires up event pipeline
 - Handles graceful shutdown with `SIGINT`/`SIGTERM`
 
 **[src/config.js](../src/config.js)** - Configuration + Logger
+
 - Validates required environment variables
 - Exports frozen `config` object
 - Exports pino logger with caller info and pretty printing
 
 **[src/bot/listener.js](../src/bot/listener.js)** - GramJS Wrapper
+
 - Returns EventEmitter that emits `'message'` events
 - Resolves multiple source channels and tags each event with its origin
 - Handles session management (`.telegram-session` file)
@@ -54,6 +58,7 @@ src/
 - Provides `stop()` for graceful shutdown
 
 **[src/bot/sender.js](../src/bot/sender.js)** - Telegraf Wrapper
+
 - Returns object with `send({ text, media, mediaType, sourceId })` method
 - Uses retry utility for rate-limit handling
 - Handles media upload caching (first upload, then reuse file_id)
@@ -61,6 +66,7 @@ src/
 - Provides `stop(signal)` for graceful shutdown
 
 **[src/bot/middleware/filter.js](../src/bot/middleware/filter.js)** - Pure Filtering
+
 - Pure function: `filterMessage(msg, config) → data | null`
 - Extracts text, applies regex filter, strips footer, escapes HTML
 - Returns null if message should be dropped
