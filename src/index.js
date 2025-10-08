@@ -1,9 +1,22 @@
-import { config, logger, maskChatId } from './config.js'
-import { createListener } from './bot/listener.js'
-import { createSender } from './bot/sender.js'
-import { filterMessage } from './bot/middleware/filter.js'
+import {
+  config as baseConfig,
+  logger as baseLogger,
+  maskChatId as baseMaskChatId
+} from './config.js'
+import { createListener as baseCreateListener } from './bot/listener.js'
+import { createSender as baseCreateSender } from './bot/sender.js'
+import { filterMessage as baseFilterMessage } from './bot/middleware/filter.js'
 
-async function main() {
+export async function main({
+  config = baseConfig,
+  logger = baseLogger,
+  maskChatId = baseMaskChatId,
+  createListener = baseCreateListener,
+  createListenerOverrides,
+  createSender = baseCreateSender,
+  filterMessage = baseFilterMessage,
+  nodeProcess = globalThis.process
+} = {}) {
   logger.info('Telegram Replicator starting')
 
   logger.info(
@@ -26,16 +39,19 @@ async function main() {
   }
 
   try {
-    const sender = await createSender(config.botToken, config.targets)
+    const sender = await createSender(config.botToken, config.targets, {})
     logger.info({ targets: config.targets.map(maskChatId) }, 'Targets configured')
 
-    const listener = await createListener({
-      apiId: config.apiId,
-      apiHash: config.apiHash,
-      phone: config.phone,
-      sources: config.sources,
-      twoFactorPassword: config.twoFactorPassword
-    })
+    const listener = await createListener(
+      {
+        apiId: config.apiId,
+        apiHash: config.apiHash,
+        phone: config.phone,
+        sources: config.sources,
+        twoFactorPassword: config.twoFactorPassword
+      },
+      createListenerOverrides
+    )
 
     logger.info(
       {
@@ -89,19 +105,21 @@ async function main() {
         await listener.stop()
         sender.stop(signal)
         logger.info('Shutdown complete')
-        process.exit(0)
+        nodeProcess.exit(0)
       } catch (err) {
         logger.error({ err }, 'Error during shutdown')
-        process.exit(1)
+        nodeProcess.exit(1)
       }
     }
 
-    process.once('SIGINT', () => shutdown('SIGINT'))
-    process.once('SIGTERM', () => shutdown('SIGTERM'))
+    nodeProcess.once('SIGINT', () => shutdown('SIGINT'))
+    nodeProcess.once('SIGTERM', () => shutdown('SIGTERM'))
   } catch (error) {
     logger.error({ err: error }, 'Fatal error during bootstrap')
-    process.exit(1)
+    nodeProcess.exit(1)
   }
 }
 
-main()
+if (process.env.NODE_ENV !== 'test') {
+  main()
+}
