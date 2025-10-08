@@ -4,44 +4,58 @@ import path from 'node:path'
 import { TelegramClient } from 'telegram'
 import { StringSession } from 'telegram/sessions/index.js'
 import { NewMessage } from 'telegram/events/index.js'
-import { logger } from '../config.js'
+import { logger as baseLogger } from '../config.js'
 
 const SESSION_FILE = '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 
-export async function createListener({ apiId, apiHash, phone, sources, twoFactorPassword = '' }) {
+export async function createListener(
+  { apiId, apiHash, phone, sources, twoFactorPassword = '' },
+  {
+    clientFactory,
+    sessionFile = SESSION_FILE,
+    fs: fsModule = fs,
+    logger: overrideLogger,
+    process: proc = process,
+    eventClass = NewMessage
+  } = {}
+) {
+  const log = overrideLogger ?? baseLogger
   const emitter = new EventEmitter()
 
   if (!Array.isArray(sources) || sources.length === 0) {
     throw new Error('createListener requires at least one source channel')
   }
 
-  const sessionPath = path.resolve(SESSION_FILE)
+  const sessionPath = path.resolve(sessionFile)
   let session = ''
-  if (fs.existsSync(sessionPath)) {
+  if (fsModule.existsSync(sessionPath)) {
     try {
-      const stats = fs.statSync(sessionPath)
+      const stats = fsModule.statSync(sessionPath)
       if (stats.mode & 0o077) {
-        logger.warn(
-          { file: SESSION_FILE, currentMode: stats.mode.toString(8) },
+        log.warn(
+          { file: sessionFile, currentMode: stats.mode.toString(8) },
           'Session file has insecure permissions, fixing to 0600'
         )
-        fs.chmodSync(sessionPath, 0o600)
+        fsModule.chmodSync(sessionPath, 0o600)
       }
-      session = fs.readFileSync(sessionPath, 'utf8')
+      session = fsModule.readFileSync(sessionPath, 'utf8')
     } catch (err) {
-      logger.error({ err, file: SESSION_FILE }, 'Failed to read session file')
+      log.error({ err, file: sessionFile }, 'Failed to read session file')
       throw new Error(`Cannot read session file: ${err.message}`)
     }
   }
 
-  const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
-    connectionRetries: CONNECTION_RETRIES
-  })
+  const defaultClientFactory = (sessionString) =>
+    new TelegramClient(new StringSession(sessionString), apiId, apiHash, {
+      connectionRetries: CONNECTION_RETRIES
+    })
+
+  const client = (clientFactory ?? defaultClientFactory)(session)
 
   if (!session) {
-    logger.info('No session found, starting authentication')
+    log.info('No session found, starting authentication')
     await client.start({
       phoneNumber: phone,
       password: async () => {
@@ -49,38 +63,38 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
           return twoFactorPassword
         }
 
-        const envPassword = process.env.TG_2FA_PASSWORD
+        const envPassword = proc.env?.TG_2FA_PASSWORD
         if (envPassword) {
           return envPassword
         }
 
         return new Promise((resolve) => {
-          process.stdout.write('Enter 2FA password (press Enter to skip): ')
-          process.stdin.once('data', (data) => resolve(data.toString().trim()))
+          proc.stdout?.write?.('Enter 2FA password (press Enter to skip): ')
+          proc.stdin?.once?.('data', (data) => resolve(data.toString().trim()))
         })
       },
       phoneCode: async () =>
         new Promise((resolve) => {
-          process.stdout.write('Enter SMS code: ')
-          process.stdin.once('data', (data) => resolve(data.toString().trim()))
+          proc.stdout?.write?.('Enter SMS code: ')
+          proc.stdin?.once?.('data', (data) => resolve(data.toString().trim()))
         }),
-      onError: (err) => logger.error({ err }, 'Authentication error')
+      onError: (err) => log.error({ err }, 'Authentication error')
     })
     const sessionData = client.session.save()
-    fs.writeFileSync(sessionPath, sessionData, { mode: 0o600 })
-    const stats = fs.statSync(sessionPath)
+    fsModule.writeFileSync(sessionPath, sessionData, { mode: 0o600 })
+    const stats = fsModule.statSync(sessionPath)
     if (stats.mode & 0o077) {
-      logger.error(
-        { file: SESSION_FILE, currentMode: stats.mode.toString(8) },
+      log.error(
+        { file: sessionFile, currentMode: stats.mode.toString(8) },
         'Failed to set secure permissions on session file'
       )
       throw new Error('Security check failed: session file permissions are insecure')
     }
-    logger.info({ file: SESSION_FILE }, 'Session saved')
-    logger.warn('Session file contains auth token - keep it secure (chmod 600)')
+    log.info({ file: sessionFile }, 'Session saved')
+    log.warn('Session file contains auth token - keep it secure (chmod 600)')
   } else {
     await client.connect()
-    logger.debug('Session restored from file')
+    log.debug('Session restored from file')
   }
 
   // Get dialogs to ensure connection is ready
@@ -96,7 +110,7 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
       const label = username || entity.title || input
 
       if (channelMap.has(channelId)) {
-        logger.warn(
+        log.warn(
           {
             channelId: channelId.toString(),
             duplicatedInput: input,
@@ -107,15 +121,44 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
         continue
       }
 
-      logger.info(
+      const isVerified = Boolean(entity.verified)
+      const isScam = Boolean(entity.scam)
+      const isFake = Boolean(entity.fake)
+
+      log.info(
         {
           id: channelId.toString(),
           username,
           title: entity.title || null,
-          input
+          input,
+          verified: isVerified,
+          scam: isScam,
+          fake: isFake
         },
         'Source channel resolved'
       )
+
+      if (isScam || isFake) {
+        log.error(
+          {
+            id: channelId.toString(),
+            input,
+            title: entity.title || null,
+            scam: isScam,
+            fake: isFake
+          },
+          'Source channel flagged by Telegram metadata; review before replicating'
+        )
+      } else if (!isVerified) {
+        log.warn(
+          {
+            id: channelId.toString(),
+            input,
+            title: entity.title || null
+          },
+          'Source channel is not verified; confirm authenticity before replicating'
+        )
+      }
 
       channelMap.set(channelId, {
         id: channelId,
@@ -127,7 +170,7 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
       const hint = startsWithAt
         ? `Ensure you're a member of ${input}, or use numeric ID (-100...)`
         : `Ensure the numeric ID is correct and you're a member`
-      logger.error({ source: input, err }, 'Failed to resolve source channel')
+      log.error({ source: input, err }, 'Failed to resolve source channel')
       throw new Error(
         `Cannot find Telegram channel: ${input}\n` +
           `  → ${hint}\n` +
@@ -139,11 +182,11 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
   client.addEventHandler((event) => {
     const msg = event.message
     if (!msg) {
-      logger.debug({ event: event.className }, 'Event received without message')
+      log.debug({ event: event.className }, 'Event received without message')
       return
     }
 
-    logger.debug(
+    log.debug(
       {
         msgId: msg.id,
         peerId: msg.peerId,
@@ -166,7 +209,7 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
         // GramJS sometimes returns channelId as an object with toString()
         lookupId = BigInt(msgChannelId.toString())
       } else {
-        logger.debug({ msgChannelId, type: typeof msgChannelId }, 'Unknown channelId type')
+        log.debug({ msgChannelId, type: typeof msgChannelId }, 'Unknown channelId type')
         return
       }
 
@@ -175,7 +218,7 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
         return
       }
 
-      logger.debug(
+      log.debug(
         {
           msgId: msg.id,
           hasMedia: !!msg.media,
@@ -186,12 +229,12 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
       )
       emitter.emit('message', { message: msg, source: sourceInfo })
     }
-  }, new NewMessage({}))
+  }, new eventClass({}))
 
   // Handle connection state changes - exit on disconnect to let PM2 restart
   client.on('disconnected', () => {
-    logger.error('GramJS connection lost, exiting for clean restart')
-    process.exit(1)
+    log.error('GramJS connection lost, exiting for clean restart')
+    proc.exit?.(1)
   })
 
   // Additional connection state monitoring
@@ -199,20 +242,20 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
   if (connectionState !== undefined) {
     const checkConnection = setInterval(() => {
       if (!client.connected) {
-        logger.error('Connection check failed - client not connected, exiting')
+        log.error('Connection check failed - client not connected, exiting')
         clearInterval(checkConnection)
-        process.exit(1)
+        proc.exit?.(1)
       }
     }, CONNECTION_CHECK_INTERVAL_MS)
 
     emitter.once('stop', () => clearInterval(checkConnection))
   }
 
-  logger.info({ sourceCount: channelMap.size }, 'Listener ready')
+  log.info({ sourceCount: channelMap.size }, 'Listener ready')
 
   return Object.assign(emitter, {
     stop: async () => {
-      logger.info('Stopping listener')
+      log.info('Stopping listener')
       emitter.emit('stop')
       await client.disconnect()
     },
@@ -228,7 +271,7 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
 
       const size = msg.media.document?.size
       if (size && BigInt(size) > BigInt(maxBytes)) {
-        logger.debug({ msgId: msg.id, size }, 'Media exceeds size limit')
+        log.debug({ msgId: msg.id, size }, 'Media exceeds size limit')
         return null
       }
 
@@ -248,7 +291,7 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
         if (possibleSizes.length) {
           const maxPhotoSize = Math.max(...possibleSizes)
           if (BigInt(maxPhotoSize) > BigInt(maxBytes)) {
-            logger.debug({ msgId: msg.id, size: maxPhotoSize }, 'Photo exceeds size limit')
+            log.debug({ msgId: msg.id, size: maxPhotoSize }, 'Photo exceeds size limit')
             return null
           }
         }
@@ -256,9 +299,20 @@ export async function createListener({ apiId, apiHash, phone, sources, twoFactor
 
       try {
         const buffer = await client.downloadMedia(msg, {})
-        return Buffer.isBuffer(buffer) ? buffer : null
+        if (!Buffer.isBuffer(buffer)) return null
+
+        // Verify actual size after download (metadata can be inaccurate)
+        if (buffer.length > maxBytes) {
+          log.debug(
+            { msgId: msg.id, actualSize: buffer.length, limit: maxBytes },
+            'Media exceeds size limit after download'
+          )
+          return null
+        }
+
+        return buffer
       } catch (err) {
-        logger.error({ msgId: msg.id, err }, 'Media download failed')
+        log.error({ msgId: msg.id, err }, 'Media download failed')
         return null
       }
     }
