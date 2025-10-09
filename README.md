@@ -5,7 +5,7 @@
 ![Coverage](https://codecov.io/gh/hxreborn/telegram-replicator/branch/master/graph/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-Event-driven message replicator for Telegram. N→N channel replication with regex filtering.
+Event-driven message replicator for Telegram. Monitors one or many source channels, applies regex filters, broadcasts to multiple targets.
 
 ## Features
 
