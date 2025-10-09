@@ -158,7 +158,7 @@ export const config = Object.freeze({
   ),
   maxMediaBytes: validateMaxMediaBytes(process.env.MAX_MEDIA_BYTES),
   supportedMediaTypes: getSupportedMediaTypes(process.env.SUPPORTED_MEDIA_TYPES),
-  logLevel: process.env.LOG_LEVEL || 'info'
+  logLevel: isTest ? 'silent' : process.env.LOG_LEVEL || 'info'
 })
 
 /**
