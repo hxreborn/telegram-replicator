@@ -85,8 +85,11 @@ export async function createSender(
                 initialRetryAfter: retryAfter,
                 context: { chatId, sourceId }
               })
-            } catch {
-              // All retries exhausted, already logged by retry utility
+            } catch (retryErr) {
+              logger.error(
+                { chatId: maskChatId(chatId), sourceId, err: retryErr },
+                'Failed to send message after exhausting retries'
+              )
             }
           } else {
             logger.error({ chatId: maskChatId(chatId), sourceId, err }, 'Failed to send message')
