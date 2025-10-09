@@ -226,3 +226,34 @@ test('sender stop method is callable', async () => {
   // Should not throw
   sender.stop('SIGTERM')
 })
+
+test('sender handles media upload returning no file_id gracefully', async () => {
+  // Adapter that returns malformed photo response (no file_id)
+  const brokenAdapter = {
+    async deleteWebhook() {
+      return true
+    },
+    async getMe() {
+      return { username: 'test', id: 1 }
+    },
+    async sendPhoto() {
+      // Returns response without file_id (edge case)
+      return { photo: [{ width: 100, height: 100 }], message_id: 1 }
+    }
+  }
+
+  const sender = await createSender('fake_token', [111, 222], {
+    adapterFactory: () => brokenAdapter
+  })
+
+  // Should not throw - handles null fileId gracefully
+  await sender.send({
+    text: 'Test',
+    media: Buffer.from('image'),
+    mediaType: 'photo',
+    sourceId: 'src#test'
+  })
+
+  // If we get here without throwing, the null fileId was handled
+  assert.ok(true, 'sender handled null fileId without crashing')
+})
