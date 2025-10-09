@@ -7,6 +7,35 @@ const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
 const DEFAULT_FLOOD_WAIT_SECONDS = 30
 
+// Media type adapters with Telegram API method configuration
+const MEDIA_ADAPTERS = {
+  photo: {
+    method: 'sendPhoto',
+    filename: 'photo.jpg',
+    extractFileId: (result) => result.photo?.at(-1)?.file_id
+  },
+  video: {
+    method: 'sendVideo',
+    filename: 'video.mp4',
+    extractFileId: (result) => result.video?.file_id
+  },
+  audio: {
+    method: 'sendAudio',
+    filename: 'audio.mp3',
+    extractFileId: (result) => result.audio?.file_id
+  },
+  voice: {
+    method: 'sendVoice',
+    filename: 'voice.ogg',
+    extractFileId: (result) => result.voice?.file_id
+  },
+  document: {
+    method: 'sendDocument',
+    filename: 'file.bin',
+    extractFileId: (result) => result.document?.file_id
+  }
+}
+
 export async function createSender(
   token,
   targets,
@@ -112,44 +141,16 @@ export async function createSender(
 
 async function sendMedia(adapter, chatId, buffer, type, caption) {
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
+  const config = MEDIA_ADAPTERS[type]
 
-  if (type === 'photo') {
-    const result = await adapter.sendPhoto(
-      chatId,
-      { source: buffer, filename: 'photo.jpg' },
-      options
-    )
-    return result.photo?.at(-1)?.file_id
-  } else if (type === 'video') {
-    const result = await adapter.sendVideo(
-      chatId,
-      { source: buffer, filename: 'video.mp4' },
-      options
-    )
-    return result.video?.file_id
-  } else if (type === 'audio') {
-    const result = await adapter.sendAudio(
-      chatId,
-      { source: buffer, filename: 'audio.mp3' },
-      options
-    )
-    return result.audio?.file_id
-  } else if (type === 'voice') {
-    const result = await adapter.sendVoice(
-      chatId,
-      { source: buffer, filename: 'voice.ogg' },
-      options
-    )
-    return result.voice?.file_id
-  } else if (type === 'document') {
-    const result = await adapter.sendDocument(
-      chatId,
-      { source: buffer, filename: 'file.bin' },
-      options
-    )
-    return result.document?.file_id
-  }
-  return null
+  if (!config) return null
+
+  const result = await adapter[config.method](
+    chatId,
+    { source: buffer, filename: config.filename },
+    options
+  )
+  return config.extractFileId(result)
 }
 
 async function sendCachedMedia(adapter, chatId, fileId, type, caption) {
@@ -158,17 +159,10 @@ async function sendCachedMedia(adapter, chatId, fileId, type, caption) {
   }
 
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
+  const config = MEDIA_ADAPTERS[type]
 
-  if (type === 'photo') {
-    await adapter.sendPhoto(chatId, fileId, options)
-  } else if (type === 'video') {
-    await adapter.sendVideo(chatId, fileId, options)
-  } else if (type === 'audio') {
-    await adapter.sendAudio(chatId, fileId, options)
-  } else if (type === 'voice') {
-    await adapter.sendVoice(chatId, fileId, options)
-  } else if (type === 'document') {
-    await adapter.sendDocument(chatId, fileId, options)
+  if (config) {
+    await adapter[config.method](chatId, fileId, options)
   }
 }
 
