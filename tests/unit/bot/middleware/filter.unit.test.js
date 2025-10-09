@@ -223,3 +223,29 @@ test('filterMessage handles audio with voice:true in attributes as voice', () =>
   assert.ok(result)
   assert.strictEqual(result.mediaType, 'document')
 })
+
+test('filterMessage rejects messages with unknown media types', () => {
+  const msg = {
+    id: 18,
+    caption: 'Tech update',
+    media: {
+      _: 'messageMediaWebPage',
+      webpage: { url: 'https://example.com' }
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  assert.strictEqual(result, null, 'should reject unknown media types')
+})
+
+test('filterMessage handles media with missing type identifier gracefully', () => {
+  const msg = {
+    id: 19,
+    caption: 'Tech update',
+    media: {
+      // No _, className, or constructor.name
+      someOtherField: 'value'
+    }
+  }
+  const result = filterMessage(msg, mockConfig)
+  assert.strictEqual(result, null, 'should reject media with no type identifier')
+})
