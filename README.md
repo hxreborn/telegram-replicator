@@ -82,7 +82,7 @@ NODE_ENV=production                              # production|development|test
 │  Listener   │─────▶│   Filter    │─────▶│   Sender    │
 │  (GramJS)   │ msg  │ (transform) │ data │ (Telegraf)  │
 └─────────────┘      └─────────────┘      └─────────────┘
-  User Client       Pure Function         Bot API
+  User Client        Middleware           Bot API
 ```
 
 **Pipeline:**
