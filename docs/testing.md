@@ -576,7 +576,7 @@ describe('Telegraf API Contract', () => {
 
 ```
 tests/
-├── unit/                          # Pure unit tests
+├── unit/                          # Unit tests
 │   ├── bot/
 │   │   ├── middleware/
 │   │   │   └── filter.test.js     # Filter logic

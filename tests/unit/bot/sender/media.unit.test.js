@@ -2,7 +2,7 @@ import { test } from '@jest/globals'
 import assert from 'node:assert/strict'
 import { splitIntoChunks } from '../../../../src/bot/sender.js'
 
-// These tests focus on the pure function logic (splitIntoChunks).
+// These tests focus on the stateless function logic (splitIntoChunks).
 // Full sender tests with adapter pattern are in tests/unit/bot/sender/index.unit.test.js
 
 test('splitIntoChunks with caption limit (1024)', () => {

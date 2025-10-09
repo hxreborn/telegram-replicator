@@ -170,7 +170,7 @@ src/
     ├── listener.js             # GramJS EventEmitter wrapper
     ├── sender.js               # Telegraf wrapper
     └── middleware/
-        └── filter.js           # Pure filtering function
+        └── filter.js           # Message filtering function
 ```
 
 ## Further Reading
@@ -194,11 +194,12 @@ npm test && npm run lint && npm run format
 
 **Future ideas:** Auto-reconnect, album/grouped media support, voice messages by default.
 
-## License
-
-MIT - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
 - **Issues:** https://github.com/hxreborn/telegram-replicator/issues
 - **Documentation:** https://github.com/hxreborn/telegram-replicator/tree/master/docs
+
+## License
+
+MIT - See [LICENSE](LICENSE) file for details.

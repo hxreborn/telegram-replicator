@@ -9,12 +9,12 @@ Event-driven pipeline with minimal dependencies: **6 files, ~665 lines total**
 │   listener   │ ──────→│    filter    │──────→ │    sender    │
 │   (GramJS)   │  msg   │ (transform)  │ data   │  (Telegraf)  │
 └──────────────┘        └──────────────┘        └──────────────┘
-     EventEmitter            Pure function          Bot API
+     EventEmitter            Middleware             Bot API
 ```
 
 **Data flow:**
 1. GramJS listener emits `message` events from source channels
-2. Filter transforms/validates messages (pure function)
+2. Filter transforms/validates messages (stateless function)
 3. Sender broadcasts to target channels with retry logic
 
 ## Project Structure
@@ -182,7 +182,7 @@ await sender.stop()
 // "...continuation" (904 chars)
 ```
 
-### [src/bot/middleware/filter.js](../src/bot/middleware/filter.js) - Pure Filtering
+### [src/bot/middleware/filter.js](../src/bot/middleware/filter.js) - Message Filtering
 
 **Responsibilities:**
 - Extract text from message
@@ -191,7 +191,7 @@ await sender.stop()
 - Escape HTML entities
 - Validate media type/size
 
-**Pure function signature:**
+**Function signature:**
 ```javascript
 function filterMessage(msg, config) {
   // Returns: { text, media, mediaType, sourceId } | null
@@ -228,7 +228,7 @@ const listener = await createListener(config)
 const sender = await createSender(config)
 ```
 
-### 3. Pure Functions
+### 3. Stateless Functions
 `filterMessage()` has no side effects. Given same input, always returns same output.
 
 ```javascript
@@ -359,7 +359,7 @@ See [operations.md](operations.md) for monitoring setup.
 ## Testing Strategy
 
 ### Unit Tests
-Pure functions and isolated components:
+Stateless functions and isolated components:
 - Filter logic (regex matching, HTML escaping)
 - Chunking algorithm
 - Retry utility
