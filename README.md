@@ -2,6 +2,7 @@
 
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 Event-driven message replicator for Telegram. N→N channel replication with regex filtering.
 
@@ -205,7 +206,3 @@ MIT - See [LICENSE](LICENSE) file for details.
 
 - **Issues:** https://github.com/hxreborn/telegram-replicator/issues
 - **Documentation:** https://github.com/hxreborn/telegram-replicator/tree/master/docs
-
----
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
