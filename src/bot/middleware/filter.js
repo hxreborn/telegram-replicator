@@ -1,5 +1,35 @@
 import { logger } from '../../config.js'
 
+// Media type detection strategies
+const MEDIA_TYPE_DETECTORS = [
+  {
+    type: 'photo',
+    detect: (media, typeNameLower) => typeNameLower.includes('photo') || media.photo
+  },
+  {
+    type: 'video',
+    detect: (media, typeNameLower) =>
+      (typeNameLower.includes('document') || media.document) && media.video === true
+  },
+  {
+    type: 'voice',
+    detect: (media, typeNameLower) =>
+      (typeNameLower.includes('document') || media.document) && media.voice === true
+  },
+  {
+    type: 'audio',
+    detect: (media, typeNameLower) => {
+      if (!typeNameLower.includes('document') && !media.document) return false
+      const attributes = media.document?.attributes || []
+      return attributes.some((attr) => attr._ === 'documentAttributeAudio' && attr.voice !== true)
+    }
+  },
+  {
+    type: 'document',
+    detect: (media, typeNameLower) => typeNameLower.includes('document') || media.document
+  }
+]
+
 export function filterMessage(msg, config) {
   const text = extractText(msg)
   if (!text) {
@@ -25,21 +55,10 @@ export function filterMessage(msg, config) {
     const typeIdentifier = msg.media._ || msg.media.className || msg.media.constructor?.name
     const typeNameLower = String(typeIdentifier || '').toLowerCase()
 
-    if (typeNameLower.includes('photo') || msg.media.photo) {
-      mediaType = 'photo'
-    } else if (typeNameLower.includes('document') || msg.media.document) {
-      if (msg.media.video === true) {
-        mediaType = 'video'
-      } else if (msg.media.voice === true) {
-        mediaType = 'voice'
-      } else {
-        const attributes = msg.media.document?.attributes || []
-        const hasAudioAttr = attributes.some(
-          (attr) => attr._ === 'documentAttributeAudio' && attr.voice !== true
-        )
-        mediaType = hasAudioAttr ? 'audio' : 'document'
-      }
-    } else {
+    // Detect media type using lookup table (order matters: check specific types first)
+    mediaType = detectMediaType(msg.media, typeNameLower)
+
+    if (!mediaType) {
       logger.debug({ msgId: msg.id, typeIdentifier }, 'Drop: unknown media type')
       return null
     }
@@ -64,6 +83,15 @@ export function filterMessage(msg, config) {
     mediaType,
     sourceId: msg.id
   }
+}
+
+function detectMediaType(media, typeNameLower) {
+  for (const detector of MEDIA_TYPE_DETECTORS) {
+    if (detector.detect(media, typeNameLower)) {
+      return detector.type
+    }
+  }
+  return null
 }
 
 function extractText(msg) {
