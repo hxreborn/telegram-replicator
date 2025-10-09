@@ -10,6 +10,10 @@ const SESSION_FILE = '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 
+// File permission constants for session security
+const INSECURE_PERMISSION_MASK = 0o077 // Mask for detecting world/group permissions
+const SECURE_FILE_PERMISSIONS = 0o600 // Owner read/write only
+
 /**
  * Safely converts various channelId types to BigInt
  * Handles GramJS's polymorphic channelId representation
@@ -72,12 +76,12 @@ export async function createListener(
   if (fsModule.existsSync(sessionPath)) {
     try {
       const stats = fsModule.statSync(sessionPath)
-      if (stats.mode & 0o077) {
+      if (stats.mode & INSECURE_PERMISSION_MASK) {
         log.warn(
           { file: sessionFile, currentMode: stats.mode.toString(8) },
           'Session file has insecure permissions, fixing to 0600'
         )
-        fsModule.chmodSync(sessionPath, 0o600)
+        fsModule.chmodSync(sessionPath, SECURE_FILE_PERMISSIONS)
       }
       session = fsModule.readFileSync(sessionPath, 'utf8')
     } catch (err) {
@@ -120,9 +124,9 @@ export async function createListener(
       onError: (err) => log.error({ err }, 'Authentication error')
     })
     const sessionData = client.session.save()
-    fsModule.writeFileSync(sessionPath, sessionData, { mode: 0o600 })
+    fsModule.writeFileSync(sessionPath, sessionData, { mode: SECURE_FILE_PERMISSIONS })
     const stats = fsModule.statSync(sessionPath)
-    if (stats.mode & 0o077) {
+    if (stats.mode & INSECURE_PERMISSION_MASK) {
       log.error(
         { file: sessionFile, currentMode: stats.mode.toString(8) },
         'Failed to set secure permissions on session file'
