@@ -8,14 +8,12 @@ Event-driven message replicator for Telegram. N→N channel replication with reg
 
 ## Features
 
-- N:N source-to-target mapping
-- Regex filtering with strip support
-- Media handling (photo, document, video, audio)
-- Exponential backoff retry logic
-- Message chunking (1024/4096 char limits)
-- Deduplication via monotonic ID tracking
-- Session file security (0600 perms)
-- Graceful SIGINT/SIGTERM handling
+- Many-to-many channel replication with configurable source/target mapping
+- Regex include/strip filters with HTML escaping for content transformation
+- Media reuse via Telegram file IDs (photo, document, video, audio)
+- Automatic retry with exponential backoff for rate-limit handling
+- Message deduplication using monotonic ID tracking
+- Secure session management with enforced 0600 permissions
 
 ## Quick Start
 
@@ -42,47 +40,14 @@ npm start
 - **Bot token** - Create a bot via @BotFather on Telegram
 - **Target chat IDs** - Use @userinfobot to get IDs (negative for groups/channels)
 
-## Configuration
+## Architecture Overview
 
-All configuration via `.env` file:
-
-```env
-# === Required ===
-API_ID=12345678                                  # From my.telegram.org/apps
-API_HASH=abcdef1234567890abcdef1234567890        # From my.telegram.org/apps
-PHONE_NUMBER=+1234567890                         # Your phone number
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...             # From @BotFather
-TG_SOURCE_CHANNEL=@channel1,@channel2            # Comma-separated (or -1001234567890)
-TG_TARGETS=-1001234567890,-1009876543210         # Comma-separated target IDs
-
-# === Optional Filtering ===
-FILTER_REGEX=tech|technology|announcement|news   # Case-insensitive include pattern
-STRIP_REGEX=(?:^|\n)Powered by.*$                # Global, case-insensitive removal pattern
-TG_2FA_PASSWORD=your_totp_password               # If you have 2FA enabled
-
-# === Media Handling ===
-SUPPORTED_MEDIA_TYPES=photo,document,video,audio # Default: photo,document
-MAX_MEDIA_BYTES=10485760                         # 10MB default
-
-# === System ===
-LOG_LEVEL=info                                   # debug|info|warn|error
-NODE_ENV=production                              # production|development|test
-```
-
-**Notes:**
-- `TG_SOURCE_CHANNEL` accepts comma-separated usernames (`@channel`) or numeric IDs (`-1001234567890`)
-- Private channels require numeric ID format
-- Your user account must be a member of source channels
-- Test regex patterns at [regex101.com](https://regex101.com) (JavaScript flavor)
-
-## How It Works
-
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│  Listener   │─────▶│   Filter    │─────▶│   Sender    │
-│  (GramJS)   │ msg  │ (transform) │ data │ (Telegraf)  │
-└─────────────┘      └─────────────┘      └─────────────┘
-  User Client        Middleware           Bot API
+```mermaid
+graph LR
+    A[Listener<br/>GramJS] -->|message| B[Filter<br/>Middleware]
+    B -->|filtered data| C[Sender<br/>Telegraf]
+    A -.->|User Client| A
+    C -.->|Bot API| C
 ```
 
 **Pipeline:**
@@ -96,15 +61,45 @@ NODE_ENV=production                              # production|development|test
 
 **Chunking:** Respects Telegram limits (1024 chars for captions, 4096 for messages), splits at word boundaries.
 
-## Commands
+## Configuration
+
+All configuration via `.env` file:
+
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `API_ID` | ✓ | - | From my.telegram.org/apps |
+| `API_HASH` | ✓ | - | From my.telegram.org/apps |
+| `PHONE_NUMBER` | ✓ | - | Your phone number (e.g., +1234567890) |
+| `TELEGRAM_BOT_TOKEN` | ✓ | - | From @BotFather |
+| `TG_SOURCE_CHANNEL` | ✓ | - | Comma-separated: `@channel` or `-1001234567890` |
+| `TG_TARGETS` | ✓ | - | Comma-separated target IDs (negative for groups/channels) |
+| `FILTER_REGEX` | | `''` | Case-insensitive include pattern (empty = all messages) |
+| `STRIP_REGEX` | | `''` | Global, case-insensitive removal pattern |
+| `TG_2FA_PASSWORD` | | - | Required if 2FA is enabled |
+| `SUPPORTED_MEDIA_TYPES` | | `photo,document` | Comma-separated: photo, document, video, audio, voice |
+| `MAX_MEDIA_BYTES` | | `10485760` | 10MB default |
+| `LOG_LEVEL` | | `info` | debug, info, warn, error |
+| `NODE_ENV` | | `production` | production, development, test |
+
+**Notes:**
+- `TG_SOURCE_CHANNEL` accepts comma-separated usernames (`@channel`) or numeric IDs (`-1001234567890`)
+- Private channels require numeric ID format
+- Your user account must be a member of source channels
+- Test regex patterns at [regex101.com](https://regex101.com) (JavaScript flavor)
+
+## Scripts & Testing
 
 ```bash
 npm start              # Start the replicator
-npm test               # Run test suite
-npm run lint           # Check code style
+npm test               # Run test suite (Node.js built-in runner)
+npm run lint           # Check code style (ESLint)
 npm run format         # Auto-format with Prettier
 npm run deploy         # Deploy to remote server
 ```
+
+**CI/CD:** Two GitHub Actions workflows run on push/PR:
+- `ci.yml` - Runs lint + tests on Node 20
+- `pr-preview.yml` - Generates coverage reports and uploads artifacts
 
 ## Troubleshooting
 
@@ -143,7 +138,27 @@ npm run deploy         # Deploy to remote server
 - Use a process manager (PM2, systemd) for auto-restart
 - See [docs/operations.md](docs/operations.md) for deployment guides
 
-## Architecture
+## Limitations
+
+- Does not forward message edits (only new messages)
+- No automatic reconnection (use PM2/systemd for restarts)
+- Duplicates possible during network retries or restarts (mitigated by monotonic ID tracking)
+- Message order not guaranteed when rate-limited
+- Voice messages require explicit `'voice'` in `SUPPORTED_MEDIA_TYPES`
+- Stickers, polls, and certain media types not supported
+
+## Security
+
+`.telegram-session` and `.env` contain plaintext credentials (lol); exclude them from version control.
+
+- Session file is automatically locked to `0600` permissions
+- Enable Telegram 2FA for additional security
+- Never commit `.env` or `.telegram-session` to git
+- Consider using secret managers for production deployments
+
+See [docs/security.md](docs/security.md) for comprehensive security guide.
+
+## Project Structure
 
 ```
 src/
@@ -158,31 +173,12 @@ src/
         └── filter.js           # Pure filtering function
 ```
 
-See [docs/architecture.md](docs/architecture.md) for detailed component descriptions.
-
-## Documentation
+## Further Reading
 
 - [Architecture](docs/architecture.md) - System design and data flow
 - [Operations](docs/operations.md) - Deployment and monitoring
 - [Security](docs/security.md) - Security best practices
 - [Testing](docs/testing.md) - Testing approach and examples
-
-## Limitations
-
-- **No auto-reconnect** - Process exits on disconnect (use PM2/systemd for restarts)
-- **Duplicates possible** - May occur during network retries or process restarts (mitigated by monotonic ID tracking)
-- **Edits ignored** - Only new messages are replicated
-- **Order not guaranteed** - When rate-limited, message order may vary
-- **Media types** - Voice messages need explicit `'voice'` in `SUPPORTED_MEDIA_TYPES`
-- **Unsupported** - Stickers, polls, and certain media types not supported
-
-## Security Warnings
-
-- `.telegram-session` and `.env` contain **plaintext credentials** (lol)
-- **Never commit** these files to version control
-- Session file is automatically locked to `0600` permissions
-- Enable Telegram 2FA for additional security
-- See [docs/security.md](docs/security.md) for comprehensive security guide
 
 ## Contributing
 
