@@ -1,7 +1,7 @@
 import { test } from '@jest/globals'
 import assert from 'node:assert/strict'
 import { createSender } from '../../../../src/bot/sender.js'
-import { createFakeAdapter } from '../../../helpers/test-doubles.js'
+import { createFakeAdapter } from '../../../helpers/test-fakes.js'
 
 test('createSender initializes adapter and clears webhook', async () => {
   const fake = createFakeAdapter()
@@ -180,14 +180,14 @@ test('sender retries on rate limit with retry_after parameter', async () => {
   const sender = await createSender('fake_token', [111], { adapterFactory: () => fakeAdapter })
 
   // Note: This test validates that retry logic is invoked
-  // The actual retry behavior is tested in retry.test.js
+  // The actual retry behavior is tested in retry.unit.test.js
   await sender.send({
     text: 'test',
     sourceId: 'src#retry'
   })
 
   // Should have attempted twice (initial + 1 retry)
-  assert.ok(callCount >= 1)
+  assert.strictEqual(callCount, 2)
 })
 
 test('sender does not retry non-rate-limit errors', async () => {

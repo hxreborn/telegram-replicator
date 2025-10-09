@@ -2,7 +2,7 @@ import { test } from '@jest/globals'
 import assert from 'node:assert/strict'
 
 import { retryWithBackoff } from '../../../src/utils/retry.js'
-import { createLoggerDouble } from '../../helpers/test-doubles.js'
+import { createLoggerDouble } from '../../helpers/test-fakes.js'
 
 test('retryWithBackoff retries once when retry_after is provided', async () => {
   let callCount = 0

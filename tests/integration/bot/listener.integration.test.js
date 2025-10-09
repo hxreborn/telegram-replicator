@@ -2,7 +2,7 @@ import { test } from '@jest/globals'
 import assert from 'node:assert/strict'
 
 import { createListener } from '../../../src/bot/listener.js'
-import { createLoggerDouble } from '../../helpers/test-doubles.js'
+import { createLoggerDouble } from '../../helpers/test-fakes.js'
 
 test('createListener emits events and surfaces channel trust metadata', async () => {
   const fsWrites = []

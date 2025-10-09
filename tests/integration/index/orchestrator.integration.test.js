@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 
 import { main } from '../../../src/index.js'
-import { createLoggerDouble } from '../../helpers/test-doubles.js'
+import { createLoggerDouble } from '../../helpers/test-fakes.js'
 
 test('main orchestrates listener, sender, dedupe, and shutdown', async () => {
   const loggerDouble = createLoggerDouble()

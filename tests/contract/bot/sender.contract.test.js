@@ -1,7 +1,7 @@
 import { test } from '@jest/globals'
 import assert from 'node:assert/strict'
 import { createSender } from '../../../src/bot/sender.js'
-import { createRecordingAdapter } from '../../helpers/test-doubles.js'
+import { createRecordingAdapter } from '../../helpers/test-fakes.js'
 
 test('contract: all text messages must include parse_mode: HTML', async () => {
   const { adapter, calls } = createRecordingAdapter()

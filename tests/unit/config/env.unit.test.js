@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, jest, test } from '@jest/globals'
 import assert from 'node:assert/strict'
-import { restoreEnv, snapshotEnv } from '../../helpers/test-doubles.js'
+import { restoreEnv, snapshotEnv } from '../../helpers/test-fakes.js'
 
 const REQUIRED_ENV = [
   'API_ID',
