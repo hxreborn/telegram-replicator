@@ -98,20 +98,21 @@ function parseTargets(targetsStr) {
     .map((t) => t.trim())
     .filter((t) => t.length > 0)
     .map((t) => {
-      const id = Number(t)
-      if (isNaN(id)) {
+      // Validate it's a valid integer string
+      if (!/^-?\d+$/.test(t)) {
         throw new Error(
           `Invalid chat ID in TG_TARGETS: "${t}"\n` +
             `  → Must be numeric. Use /getid bots to find chat IDs.`
         )
       }
-      if (id > 0) {
+      // Check if it's negative (groups/channels must be negative)
+      if (!t.startsWith('-')) {
         throw new Error(
-          `Invalid chat ID in TG_TARGETS: ${id}\n` +
+          `Invalid chat ID in TG_TARGETS: ${t}\n` +
             `  → Group/channel IDs must be negative (e.g., -1001234567890)`
         )
       }
-      return id
+      return t
     })
 
   if (ids.length === 0) {
@@ -143,7 +144,7 @@ export const config = Object.freeze({
   sources,
   // Backwards compatibility for older imports expecting single source
   source: sources[0],
-  targets: isTest ? [-1001234567890] : parseTargets(process.env.TG_TARGETS),
+  targets: isTest ? ['-1001234567890'] : parseTargets(process.env.TG_TARGETS),
 
   // Optional configuration (compiled regex)
   filterRegex: compileRegex(
@@ -163,7 +164,7 @@ export const config = Object.freeze({
 
 /**
  * Masks chat ID to prevent leaking private group IDs in logs
- * @param {number} chatId Telegram chat ID
+ * @param {number|string} chatId Telegram chat ID
  * @returns {string} Masked ID showing only last 4 digits
  */
 export function maskChatId(chatId) {
