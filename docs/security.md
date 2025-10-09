@@ -444,7 +444,7 @@ socksProxy: {
 
 ```dockerfile
 # Use specific version, not latest
-FROM node:18.20.0-alpine
+FROM node:20-alpine
 
 # Run as non-root
 USER telegram

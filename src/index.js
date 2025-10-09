@@ -63,8 +63,8 @@ export async function main({
     )
 
     // In-memory deduplication: tracks last seen message ID per source
-    // LIMITATION: State is lost on restart → duplicates may be replicated after restart
-    // For production: consider file-backed persistence or external state store
+    // State is lost on restart → duplicates may be replicated after restart
+    // Consider file-backed persistence or external state store
     const lastMessageId = new Map()
 
     listener.on('message', async ({ message: msg, source }) => {

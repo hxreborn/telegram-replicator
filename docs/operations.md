@@ -137,7 +137,7 @@ sudo journalctl -u telegram-replicator -f
 **Dockerfile:**
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Create app directory
 WORKDIR /app
