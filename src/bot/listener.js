@@ -10,6 +10,45 @@ const SESSION_FILE = '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 
+/**
+ * Safely converts various channelId types to BigInt
+ * Handles GramJS's polymorphic channelId representation
+ * @param {bigint|number|string|object} channelId - Channel ID in various formats
+ * @returns {bigint|null} BigInt representation or null if conversion fails
+ */
+function toBigIntSafe(channelId) {
+  if (channelId === undefined || channelId === null) {
+    return null
+  }
+
+  if (typeof channelId === 'bigint') {
+    return channelId
+  }
+
+  if (typeof channelId === 'number') {
+    return BigInt(channelId)
+  }
+
+  if (typeof channelId === 'string') {
+    try {
+      return BigInt(channelId)
+    } catch {
+      return null
+    }
+  }
+
+  // GramJS sometimes returns channelId as object with toString()
+  if (typeof channelId === 'object' && typeof channelId.toString === 'function') {
+    try {
+      return BigInt(channelId.toString())
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
 export async function createListener(
   { apiId, apiHash, phone, sources, twoFactorPassword = '' },
   {
@@ -197,38 +236,30 @@ export async function createListener(
     )
 
     const msgChannelId = msg.peerId?.channelId
-    if (msgChannelId !== undefined && msgChannelId !== null) {
-      let lookupId
-      if (typeof msgChannelId === 'bigint') {
-        lookupId = msgChannelId
-      } else if (typeof msgChannelId === 'number') {
-        lookupId = BigInt(msgChannelId)
-      } else if (typeof msgChannelId === 'string') {
-        lookupId = BigInt(msgChannelId)
-      } else if (typeof msgChannelId === 'object') {
-        // GramJS sometimes returns channelId as an object with toString()
-        lookupId = BigInt(msgChannelId.toString())
-      } else {
-        log.debug({ msgChannelId, type: typeof msgChannelId }, 'Unknown channelId type')
-        return
-      }
+    const lookupId = toBigIntSafe(msgChannelId)
 
-      const sourceInfo = channelMap.get(lookupId)
-      if (!sourceInfo) {
-        return
+    if (!lookupId) {
+      if (msgChannelId !== undefined && msgChannelId !== null) {
+        log.debug({ msgChannelId, type: typeof msgChannelId }, 'Failed to convert channelId to BigInt')
       }
-
-      log.debug(
-        {
-          msgId: msg.id,
-          hasMedia: !!msg.media,
-          text: (msg.message || msg.caption || '').slice(0, 50),
-          source: sourceInfo.label
-        },
-        'Message received from source'
-      )
-      emitter.emit('message', { message: msg, source: sourceInfo })
+      return
     }
+
+    const sourceInfo = channelMap.get(lookupId)
+    if (!sourceInfo) {
+      return
+    }
+
+    log.debug(
+      {
+        msgId: msg.id,
+        hasMedia: !!msg.media,
+        text: (msg.message || msg.caption || '').slice(0, 50),
+        source: sourceInfo.label
+      },
+      'Message received from source'
+    )
+    emitter.emit('message', { message: msg, source: sourceInfo })
   }, new eventClass({}))
 
   // Handle connection state changes - exit on disconnect to let PM2 restart
