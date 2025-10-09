@@ -1,103 +1,214 @@
 # telegram-replicator
 
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
+![Status](https://img.shields.io/badge/status-active-success.svg)
+
 Simple event-driven message replicator for Telegram. Monitors one or many source channels, applies regex filters, broadcasts to multiple targets.
-
-## How it works
-
-GramJS (user client) listens to source channel(s) → regex filter → Telegraf (bot) broadcasts to N targets. Handles media (photos/documents/videos/audio <10MB by default), text chunking (Telegram limits), HTML escaping, exponential backoff for rate limits, graceful shutdown.
-
-```
-Source → Filter (regex) → Strip (regex) → Broadcast to targets
-           ↓
-    Download media if present
-```
-
-~665 lines total. No DB, no external deps beyond Telegram clients.
-
-## Setup
-
-```bash
-cp .env.example .env  # Edit with your credentials
-npm install && npm start
-```
-
-**Requirements:**
-
-- Node.js 18+
-- Telegram API credentials (https://my.telegram.org/apps)
-- Bot token (@BotFather)
-- Target chat IDs (@userinfobot, negative for groups/channels)
-
-First run prompts for SMS code. Session persists in `.telegram-session`.
-
-## Configuration
-
-All config via `.env`:
-
-```env
-# Required
-API_ID=12345678
-API_HASH=abcdef...
-PHONE_NUMBER=+1234567890
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TG_SOURCE_CHANNEL=@channel1,@channel2   # or -1001234567890
-TG_TARGETS=-1001234567890,-1009876543210
-
-# Optional filtering (defaults shown)
-FILTER_REGEX=tech|technology|announcement|news|update  # case-insensitive
-STRIP_REGEX=(?:^|\n)Powered by.*$                      # global, case-insensitive
-TG_2FA_PASSWORD=your_totp_password                     # optional, for users with Telegram 2FA
-
-# Media handling
-SUPPORTED_MEDIA_TYPES=photo,document,video,audio       # default: photo,document
-MAX_MEDIA_BYTES=10485760                               # 10MB default
-
-# System
-LOG_LEVEL=info            # debug|info|warn|error
-```
-
-`TG_SOURCE_CHANNEL` accepts comma-separated usernames or numeric IDs. Order is preserved.
-
-Regex compiled at startup. Test patterns at regex101.com (JavaScript flavor).
-
-## Troubleshooting
-
-**`Cannot find Telegram channel`**: Your user account must be a member. Use numeric ID for private channels.
-
-**`Invalid chat ID` (positive number)**: Group/channel IDs are negative. Use @userinfobot to get the correct ID.
-
-**`AUTH_KEY_UNREGISTERED`**: Session expired. Delete `.telegram-session` and re-authenticate.
-
-**`FLOOD_WAIT_X`**: Rate limited. The bot implements exponential backoff with jitter (up to 4 retries per target); if all retries fail the error is logged and processing continues.
-
-**Messages not forwarded**: Check filter matches (`FILTER_REGEX`), strip doesn't empty content (`STRIP_REGEX`), or message has text (media-only dropped). Set `LOG_LEVEL=debug` to see drop reasons.
 
 ## Features
 
-- **Multi-source Support**: Listen to multiple channels or groups with a single replicator instance
-- **Smart Rate Limiting**: Exponential backoff with jitter for handling Telegram rate limits
-- **Configurable Media Types**: Support for photos, documents, videos, and audio (configurable via `SUPPORTED_MEDIA_TYPES`)
-- **Text Chunking**: Automatically splits long messages respecting word boundaries
-- **Session Security**: Enforces secure permissions (0600) on session files
+- **Multi-source Support** - Listen to multiple channels or groups simultaneously
+- **Smart Filtering** - Configurable regex patterns for include/exclude logic
+- **Media Support** - Photos, documents, videos, audio (configurable types, <10MB default)
+- **Rate Limiting** - Exponential backoff with jitter for Telegram API limits
+- **Text Chunking** - Auto-splits long messages at word boundaries
+- **Deduplication** - Prevents duplicate message processing via monotonic ID tracking
+- **Session Security** - Enforces secure permissions (0600) on session files
+- **Graceful Shutdown** - Handles SIGINT/SIGTERM cleanly
+
+## Quick Start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/hxreborn/telegram-replicator.git
+cd telegram-replicator
+npm install
+
+# 2. Configure
+cp .env.example .env
+# Edit .env with your credentials (see Configuration section)
+
+# 3. Run
+npm start
+```
+
+**First-time setup**: The app will prompt for an SMS code sent to your phone. After authentication, the session is saved to `.telegram-session` for subsequent runs.
+
+## Prerequisites
+
+- **Node.js** 18.0.0 or higher
+- **Telegram API credentials** - Get from https://my.telegram.org/apps
+- **Bot token** - Create a bot via @BotFather on Telegram
+- **Target chat IDs** - Use @userinfobot to get IDs (negative for groups/channels)
+
+## Configuration
+
+All configuration via `.env` file:
+
+```env
+# === Required ===
+API_ID=12345678                                  # From my.telegram.org/apps
+API_HASH=abcdef1234567890abcdef1234567890        # From my.telegram.org/apps
+PHONE_NUMBER=+1234567890                         # Your phone number
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...             # From @BotFather
+TG_SOURCE_CHANNEL=@channel1,@channel2            # Comma-separated (or -1001234567890)
+TG_TARGETS=-1001234567890,-1009876543210         # Comma-separated target IDs
+
+# === Optional Filtering ===
+FILTER_REGEX=tech|technology|announcement|news   # Case-insensitive include pattern
+STRIP_REGEX=(?:^|\n)Powered by.*$                # Global, case-insensitive removal pattern
+TG_2FA_PASSWORD=your_totp_password               # If you have 2FA enabled
+
+# === Media Handling ===
+SUPPORTED_MEDIA_TYPES=photo,document,video,audio # Default: photo,document
+MAX_MEDIA_BYTES=10485760                         # 10MB default
+
+# === System ===
+LOG_LEVEL=info                                   # debug|info|warn|error
+NODE_ENV=production                              # production|development|test
+```
+
+**Notes:**
+- `TG_SOURCE_CHANNEL` accepts comma-separated usernames (`@channel`) or numeric IDs (`-1001234567890`)
+- Private channels require numeric ID format
+- Your user account must be a member of source channels
+- Test regex patterns at [regex101.com](https://regex101.com) (JavaScript flavor)
+
+## How It Works
+
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│  Listener   │─────▶│   Filter    │─────▶│   Sender    │
+│  (GramJS)   │ msg  │ (transform) │ data │ (Telegraf)  │
+└─────────────┘      └─────────────┘      └─────────────┘
+  User Client       Pure Function         Bot API
+```
+
+**Pipeline:**
+1. **Listener** - GramJS user client monitors source channels
+2. **Filter** - Applies regex matching, strips content, escapes HTML
+3. **Sender** - Telegraf bot broadcasts to all target channels with retry logic
+
+**Deduplication:** Tracks last message ID per source channel, drops messages with ID ≤ last seen (leverages Telegram's monotonic message IDs).
+
+**Media:** Downloads to Buffer, uploads once, then reuses `file_id` for remaining targets (Telegram optimization).
+
+**Chunking:** Respects Telegram limits (1024 chars for captions, 4096 for messages), splits at word boundaries.
+
+## Commands
+
+```bash
+npm start              # Start the replicator
+npm test               # Run test suite
+npm run lint           # Check code style
+npm run format         # Auto-format with Prettier
+npm run deploy         # Deploy to remote server
+```
+
+## Troubleshooting
+
+### Authentication Issues
+
+**`AUTH_KEY_UNREGISTERED`**
+- Session expired. Delete `.telegram-session` and re-authenticate.
+
+**`Cannot find Telegram channel`**
+- Your user account must join the channel first
+- Use numeric ID for private channels (`-1001234567890`)
+
+### Message Issues
+
+**`Invalid chat ID` (positive number)**
+- Group/channel IDs must be negative
+- Use @userinfobot to get correct ID
+
+**Messages not forwarded**
+- Check `FILTER_REGEX` matches the message text
+- Ensure `STRIP_REGEX` doesn't remove all content
+- Media-only messages (no text/caption) are dropped
+- Set `LOG_LEVEL=debug` to see drop reasons
+
+### Rate Limiting
+
+**`FLOOD_WAIT_X`**
+- Telegram rate limit triggered
+- Bot automatically retries with exponential backoff (max 4 retries)
+- If all retries fail, error is logged and processing continues
+
+### Production Issues
+
+**Process exits on disconnect**
+- Expected behavior for resilience
+- Use a process manager (PM2, systemd) for auto-restart
+- See [docs/operations.md](docs/operations.md) for deployment guides
+
+## Architecture
+
+Total: **6 files, ~665 lines**
+
+```
+src/
+├── index.js                    # Main orchestrator
+├── config.js                   # Config validation + logger
+├── utils/
+│   └── retry.js                # Exponential backoff utility
+└── bot/
+    ├── listener.js             # GramJS EventEmitter wrapper
+    ├── sender.js               # Telegraf wrapper
+    └── middleware/
+        └── filter.js           # Pure filtering function
+```
+
+See [docs/architecture.md](docs/architecture.md) for detailed component descriptions.
+
+## Documentation
+
+- [Architecture](docs/architecture.md) - System design and data flow
+- [Operations](docs/operations.md) - Deployment and monitoring
+- [Security](docs/security.md) - Security best practices
+- [Testing](docs/testing.md) - Testing approach and examples
 
 ## Limitations
 
-- No auto-reconnect on disconnect (use process manager: systemd/pm2)
-- **Duplicate messages may occur** during network retries or process restarts (Telegram's MTProto can replay updates when reconnecting); the app only suppresses immediate replays within the same run
-- Voice messages require adding 'voice' to `SUPPORTED_MEDIA_TYPES`
-- Stickers and polls not supported
-- 2FA support requires setting `TG_2FA_PASSWORD` or responding to the interactive prompt on first run
-- Forwards new messages only (edits ignored)
-- Message order not guaranteed when rate-limited
+- **No auto-reconnect** - Process exits on disconnect (use PM2/systemd for restarts)
+- **Duplicates possible** - May occur during network retries or process restarts (mitigated by monotonic ID tracking)
+- **Edits ignored** - Only new messages are replicated
+- **Order not guaranteed** - When rate-limited, message order may vary
+- **Media types** - Voice messages need explicit `'voice'` in `SUPPORTED_MEDIA_TYPES`
+- **Unsupported** - Stickers, polls, and certain media types not supported
 
-`.telegram-session` and `.env` contain plaintext credentials. Keep them secure.
+## Security Warnings
+
+- `.telegram-session` and `.env` contain **plaintext credentials**
+- **Never commit** these files to version control
+- Session file is automatically locked to `0600` permissions
+- Enable Telegram 2FA for additional security
+- See [docs/security.md](docs/security.md) for comprehensive security guide
 
 ## Contributing
 
-Personal tool shared as-is. Fork if it doesn't fit your use case—6 core files, straightforward to modify.
+This is a personal tool shared as-is. PRs welcome if:
+- Minimal and dependency-free
+- Tests included
+- Follows existing code style (ES modules, no semicolons)
 
-PRs welcome if minimal and dependency-free. Test coverage welcomed. Future ideas: auto-reconnect, voice message support, album/grouped media.
+Run before submitting:
+```bash
+npm test && npm run lint && npm run format
+```
+
+**Future ideas:** Auto-reconnect, album/grouped media support, voice messages by default.
 
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues:** https://github.com/hxreborn/telegram-replicator/issues
+- **Documentation:** https://github.com/hxreborn/telegram-replicator/tree/master/docs
+
+---
+
+**Made with Node.js** | **6 files, ~665 lines** | **No database, minimal dependencies**
