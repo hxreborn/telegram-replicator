@@ -150,6 +150,10 @@ async function sendMedia(adapter, chatId, buffer, type, caption) {
 }
 
 async function sendCachedMedia(adapter, chatId, fileId, type, caption) {
+  if (!fileId) {
+    throw new Error(`Cannot send cached media: fileId is ${fileId}`)
+  }
+
   const options = caption && caption.length > 0 ? { caption, parse_mode: 'HTML' } : undefined
 
   if (type === 'photo') {
