@@ -42,12 +42,12 @@ npm start
 
 ## Architecture Overview
 
-```mermaid
-graph LR
-    A[Listener<br/>GramJS] -->|message| B[Filter<br/>Middleware]
-    B -->|filtered data| C[Sender<br/>Telegraf]
-    A -.->|User Client| A
-    C -.->|Bot API| C
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│  Listener   │─────▶│   Filter    │─────▶│   Sender    │
+│  (GramJS)   │ msg  │ (transform) │ data │ (Telegraf)  │
+└─────────────┘      └─────────────┘      └─────────────┘
+  User Client        Middleware           Bot API
 ```
 
 **Pipeline:**
