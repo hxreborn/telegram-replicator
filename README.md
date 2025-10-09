@@ -1,21 +1,20 @@
 # telegram-replicator
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 
-Simple event-driven message replicator for Telegram. Monitors one or many source channels, applies regex filters, broadcasts to multiple targets.
+Event-driven message replicator for Telegram. N→N channel replication with regex filtering.
 
 ## Features
 
-- **Multi-source Support** - Listen to multiple channels or groups simultaneously
-- **Smart Filtering** - Configurable regex patterns for include/exclude logic
-- **Media Support** - Photos, documents, videos, audio (configurable types, <10MB default)
-- **Rate Limiting** - Exponential backoff with jitter for Telegram API limits
-- **Text Chunking** - Auto-splits long messages at word boundaries
-- **Deduplication** - Prevents duplicate message processing via monotonic ID tracking
-- **Session Security** - Enforces secure permissions (0600) on session files
-- **Graceful Shutdown** - Handles SIGINT/SIGTERM cleanly
+- N:N source-to-target mapping
+- Regex filtering with strip support
+- Media handling (photo, document, video, audio)
+- Exponential backoff retry logic
+- Message chunking (1024/4096 char limits)
+- Deduplication via monotonic ID tracking
+- Session file security (0600 perms)
+- Graceful SIGINT/SIGTERM handling
 
 ## Quick Start
 
@@ -37,7 +36,7 @@ npm start
 
 ## Prerequisites
 
-- **Node.js** 18.0.0 or higher
+- **Node.js** 20.0.0 or higher
 - **Telegram API credentials** - Get from https://my.telegram.org/apps
 - **Bot token** - Create a bot via @BotFather on Telegram
 - **Target chat IDs** - Use @userinfobot to get IDs (negative for groups/channels)
@@ -145,8 +144,6 @@ npm run deploy         # Deploy to remote server
 
 ## Architecture
 
-Total: **6 files, ~665 lines**
-
 ```
 src/
 ├── index.js                    # Main orchestrator
@@ -180,7 +177,7 @@ See [docs/architecture.md](docs/architecture.md) for detailed component descript
 
 ## Security Warnings
 
-- `.telegram-session` and `.env` contain **plaintext credentials**
+- `.telegram-session` and `.env` contain **plaintext credentials** (lol)
 - **Never commit** these files to version control
 - Session file is automatically locked to `0600` permissions
 - Enable Telegram 2FA for additional security
@@ -211,4 +208,4 @@ MIT - See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Made with Node.js** | **6 files, ~665 lines** | **No database, minimal dependencies**
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
