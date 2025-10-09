@@ -51,6 +51,7 @@ npm start
 ```
 
 **Pipeline:**
+
 1. **Listener** - GramJS user client monitors source channels
 2. **Filter** - Applies regex matching, strips content, escapes HTML
 3. **Sender** - Telegraf bot broadcasts to all target channels with retry logic
@@ -65,23 +66,24 @@ npm start
 
 All configuration via `.env` file:
 
-| Variable | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `API_ID` | ✓ | - | From my.telegram.org/apps |
-| `API_HASH` | ✓ | - | From my.telegram.org/apps |
-| `PHONE_NUMBER` | ✓ | - | Your phone number (e.g., +1234567890) |
-| `TELEGRAM_BOT_TOKEN` | ✓ | - | From @BotFather |
-| `TG_SOURCE_CHANNEL` | ✓ | - | Comma-separated: `@channel` or `-1001234567890` |
-| `TG_TARGETS` | ✓ | - | Comma-separated target IDs (negative for groups/channels) |
-| `FILTER_REGEX` | | `''` | Case-insensitive include pattern (empty = all messages) |
-| `STRIP_REGEX` | | `''` | Global, case-insensitive removal pattern |
-| `TG_2FA_PASSWORD` | | - | Required if 2FA is enabled |
-| `SUPPORTED_MEDIA_TYPES` | | `photo,document` | Comma-separated: photo, document, video, audio, voice |
-| `MAX_MEDIA_BYTES` | | `10485760` | 10MB default |
-| `LOG_LEVEL` | | `info` | debug, info, warn, error |
-| `NODE_ENV` | | `production` | production, development, test |
+| Variable                | Required | Default          | Notes                                                     |
+| ----------------------- | -------- | ---------------- | --------------------------------------------------------- |
+| `API_ID`                | ✓        | -                | From my.telegram.org/apps                                 |
+| `API_HASH`              | ✓        | -                | From my.telegram.org/apps                                 |
+| `PHONE_NUMBER`          | ✓        | -                | Your phone number (e.g., +1234567890)                     |
+| `TELEGRAM_BOT_TOKEN`    | ✓        | -                | From @BotFather                                           |
+| `TG_SOURCE_CHANNEL`     | ✓        | -                | Comma-separated: `@channel` or `-1001234567890`           |
+| `TG_TARGETS`            | ✓        | -                | Comma-separated target IDs (negative for groups/channels) |
+| `FILTER_REGEX`          |          | `''`             | Case-insensitive include pattern (empty = all messages)   |
+| `STRIP_REGEX`           |          | `''`             | Global, case-insensitive removal pattern                  |
+| `TG_2FA_PASSWORD`       |          | -                | Required if 2FA is enabled                                |
+| `SUPPORTED_MEDIA_TYPES` |          | `photo,document` | Comma-separated: photo, document, video, audio, voice     |
+| `MAX_MEDIA_BYTES`       |          | `10485760`       | 10MB default                                              |
+| `LOG_LEVEL`             |          | `info`           | debug, info, warn, error                                  |
+| `NODE_ENV`              |          | `production`     | production, development, test                             |
 
 **Notes:**
+
 - `TG_SOURCE_CHANNEL` accepts comma-separated usernames (`@channel`) or numeric IDs (`-1001234567890`)
 - Private channels require numeric ID format
 - Your user account must be a member of source channels
@@ -98,6 +100,7 @@ npm run deploy         # Deploy to remote server
 ```
 
 **CI/CD:** Two GitHub Actions workflows run on push/PR:
+
 - `ci.yml` - Runs lint + tests on Node 20
 - `pr-preview.yml` - Generates coverage reports and uploads artifacts
 
@@ -106,19 +109,23 @@ npm run deploy         # Deploy to remote server
 ### Authentication Issues
 
 **`AUTH_KEY_UNREGISTERED`**
+
 - Session expired. Delete `.telegram-session` and re-authenticate.
 
 **`Cannot find Telegram channel`**
+
 - Your user account must join the channel first
 - Use numeric ID for private channels (`-1001234567890`)
 
 ### Message Issues
 
 **`Invalid chat ID` (positive number)**
+
 - Group/channel IDs must be negative
 - Use @userinfobot to get correct ID
 
 **Messages not forwarded**
+
 - Check `FILTER_REGEX` matches the message text
 - Ensure `STRIP_REGEX` doesn't remove all content
 - Media-only messages (no text/caption) are dropped
@@ -127,6 +134,7 @@ npm run deploy         # Deploy to remote server
 ### Rate Limiting
 
 **`FLOOD_WAIT_X`**
+
 - Telegram rate limit triggered
 - Bot automatically retries with exponential backoff (max 4 retries)
 - If all retries fail, error is logged and processing continues
@@ -134,6 +142,7 @@ npm run deploy         # Deploy to remote server
 ### Production Issues
 
 **Process exits on disconnect**
+
 - Expected behavior for resilience
 - Use a process manager (PM2, systemd) for auto-restart
 - See [docs/operations.md](docs/operations.md) for deployment guides
@@ -183,17 +192,18 @@ src/
 ## Contributing
 
 This is a personal tool shared as-is. PRs welcome if:
+
 - Minimal and dependency-free
 - Tests included
 - Follows existing code style (ES modules, no semicolons)
 
 Run before submitting:
+
 ```bash
 npm test && npm run lint && npm run format
 ```
 
 **Future ideas:** Auto-reconnect, album/grouped media support, voice messages by default.
-
 
 ## Support
 

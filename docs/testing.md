@@ -17,6 +17,7 @@ Comprehensive testing approach for the Telegram message replicator.
 ## Testing Philosophy
 
 **Core principles:**
+
 1. **Tests should be fast** - Unit tests run in <100ms
 2. **Tests should be isolated** - No shared state between tests
 3. **Tests should be reliable** - No flaky tests, deterministic outcomes
@@ -24,6 +25,7 @@ Comprehensive testing approach for the Telegram message replicator.
 5. **Test behavior, not implementation** - Focus on public APIs
 
 **Test pyramid:**
+
 ```
        /\
       /  \       E2E (Manual)
@@ -62,12 +64,14 @@ npm run test:integration
 ### Test Environment
 
 **Environment variables:**
+
 ```env
 NODE_ENV=test
 LOG_LEVEL=error  # Suppress logs during tests
 ```
 
 **Jest configuration** (`jest.config.js`):
+
 ```javascript
 export default {
   testEnvironment: 'node',
@@ -77,7 +81,7 @@ export default {
   testMatch: ['**/tests/**/*.test.js'],
   collectCoverageFrom: [
     'src/**/*.js',
-    '!src/index.js'  // Integration test only
+    '!src/index.js' // Integration test only
   ],
   coverageThresholds: {
     global: {
@@ -97,6 +101,7 @@ export default {
 **Location:** `tests/unit/bot/middleware/filter.test.js`
 
 **Coverage:**
+
 - Text filtering (regex match/no match)
 - Content stripping (footer removal)
 - HTML escaping (`<`, `>`, `&`)
@@ -106,6 +111,7 @@ export default {
 - Edge cases (null, undefined, empty strings)
 
 **Example:**
+
 ```javascript
 import { describe, it } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -168,10 +174,7 @@ describe('filterMessage', () => {
     const result = filterMessage(msg, mockConfig)
 
     assert.ok(result)
-    assert.strictEqual(
-      result.text,
-      'Tech &lt;script&gt;alert("xss")&lt;/script&gt; &amp; more'
-    )
+    assert.strictEqual(result.text, 'Tech &lt;script&gt;alert("xss")&lt;/script&gt; &amp; more')
   })
 
   it('should validate media type', () => {
@@ -208,6 +211,7 @@ describe('filterMessage', () => {
 **Location:** `tests/unit/bot/sender-chunks.test.js`
 
 **Coverage:**
+
 - Message chunking at word boundaries
 - Long token handling (URLs, base64)
 - Caption vs message limits (1024 vs 4096 chars)
@@ -215,6 +219,7 @@ describe('filterMessage', () => {
 - Single word exceeding limit
 
 **Example:**
+
 ```javascript
 import { describe, it } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -230,7 +235,7 @@ describe('chunkText', () => {
   })
 
   it('should chunk at word boundaries', () => {
-    const text = 'a '.repeat(3000)  // 6000 chars
+    const text = 'a '.repeat(3000) // 6000 chars
     const chunks = chunkText(text, 4096)
 
     assert.strictEqual(chunks.length, 2)
@@ -244,11 +249,11 @@ describe('chunkText', () => {
     const chunks = chunkText(longUrl, 4096)
 
     assert.ok(chunks.length > 1)
-    chunks.forEach(chunk => assert.ok(chunk.length <= 4096))
+    chunks.forEach((chunk) => assert.ok(chunk.length <= 4096))
   })
 
   it('should respect caption limit', () => {
-    const text = 'a '.repeat(600)  // 1200 chars
+    const text = 'a '.repeat(600) // 1200 chars
     const chunks = chunkText(text, 1024)
 
     assert.strictEqual(chunks.length, 2)
@@ -263,6 +268,7 @@ describe('chunkText', () => {
 **Location:** `tests/unit/utils/retry.test.js`
 
 **Coverage:**
+
 - Successful retry after failures
 - Exponential backoff timing
 - Max retries exceeded
@@ -270,6 +276,7 @@ describe('chunkText', () => {
 - Non-retryable errors
 
 **Example:**
+
 ```javascript
 import { describe, it, beforeEach } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -321,12 +328,9 @@ describe('retry', () => {
       throw new Error('AUTH_KEY_UNREGISTERED')
     }
 
-    await assert.rejects(
-      async () => await retry(fn, { maxRetries: 3 }),
-      /AUTH_KEY_UNREGISTERED/
-    )
+    await assert.rejects(async () => await retry(fn, { maxRetries: 3 }), /AUTH_KEY_UNREGISTERED/)
 
-    assert.strictEqual(attempts, 1)  // No retries
+    assert.strictEqual(attempts, 1) // No retries
   })
 })
 ```
@@ -338,12 +342,14 @@ describe('retry', () => {
 **Location:** `tests/integration/pipeline.test.js`
 
 **Setup:**
+
 - Mock GramJS client
 - Mock Telegraf bot
 - Real filter logic
 - Real orchestration
 
 **Example:**
+
 ```javascript
 import { describe, it, beforeEach, afterEach } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -376,7 +382,7 @@ describe('Message Pipeline Integration', () => {
     listener.emit('message', msg)
 
     // Wait for async processing
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     assert.strictEqual(messages.length, 1)
     assert.strictEqual(messages[0].text, 'Tech news update')
@@ -391,7 +397,7 @@ describe('Message Pipeline Integration', () => {
 
     listener.emit('message', msg)
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     assert.strictEqual(messages.length, 0)
   })
@@ -406,7 +412,7 @@ describe('Message Pipeline Integration', () => {
 
     listener.emit('message', msg)
 
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     assert.strictEqual(messages.length, 1)
     assert.ok(messages[0].media)
@@ -422,12 +428,14 @@ describe('Message Pipeline Integration', () => {
 **Requires:** Real Telegram bot credentials (set `RUN_TELEGRAM_INTEGRATION=1`)
 
 **Coverage:**
+
 - Real API calls to Telegram
 - Rate limiting behavior
 - Media upload and caching
 - Error handling
 
 **Example:**
+
 ```javascript
 import { describe, it, beforeAll, afterAll } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -463,10 +471,12 @@ describe('Sender Integration (Telegram API)', () => {
     // Send many messages rapidly
     const promises = []
     for (let i = 0; i < 30; i++) {
-      promises.push(sender.send({
-        text: `Rate limit test ${i}`,
-        sourceId: -1001234567890
-      }))
+      promises.push(
+        sender.send({
+          text: `Rate limit test ${i}`,
+          sourceId: -1001234567890
+        })
+      )
     }
 
     await Promise.all(promises)
@@ -485,6 +495,7 @@ describe('Sender Integration (Telegram API)', () => {
 **Purpose:** Verify assumptions about GramJS message structure
 
 **Example:**
+
 ```javascript
 import { describe, it } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -515,7 +526,7 @@ describe('GramJS Message Contract', () => {
       'messageMediaVoice'
     ]
 
-    mediaTypes.forEach(type => {
+    mediaTypes.forEach((type) => {
       const msg = { id: 1, media: { _: type } }
       assert.strictEqual(msg.media._, type)
     })
@@ -538,6 +549,7 @@ describe('GramJS Message Contract', () => {
 **Purpose:** Verify assumptions about Telegraf bot API
 
 **Example:**
+
 ```javascript
 import { describe, it } from '@jest/globals'
 import assert from 'node:assert/strict'
@@ -602,6 +614,7 @@ tests/
 **Purpose:** Reusable mock objects
 
 **Example:**
+
 ```javascript
 import EventEmitter from 'events'
 
@@ -658,6 +671,7 @@ export function createMockConfig(overrides = {}) {
 **Purpose:** Custom assertion helpers
 
 **Example:**
+
 ```javascript
 import assert from 'node:assert/strict'
 
@@ -687,6 +701,7 @@ export function assertValidChunks(chunks, maxLength) {
 ### Writing Good Tests
 
 **1. Arrange-Act-Assert pattern:**
+
 ```javascript
 it('should filter message', () => {
   // Arrange - set up test data
@@ -703,6 +718,7 @@ it('should filter message', () => {
 ```
 
 **2. Descriptive test names:**
+
 ```javascript
 // Good
 it('should drop message when filter regex does not match')
@@ -716,6 +732,7 @@ it('checks media')
 ```
 
 **3. Test one thing at a time:**
+
 ```javascript
 // Good - focused test
 it('should escape less-than symbol', () => {
@@ -730,6 +747,7 @@ it('should filter and escape', () => {
 ```
 
 **4. Avoid test interdependence:**
+
 ```javascript
 // Good - isolated
 let msg
@@ -738,12 +756,13 @@ beforeEach(() => {
 })
 
 // Bad - shared state
-const msg = createMockMessage()  // Reused across tests
+const msg = createMockMessage() // Reused across tests
 ```
 
 ### Common Patterns
 
 **Testing async functions:**
+
 ```javascript
 it('should handle async operation', async () => {
   const result = await asyncFunction()
@@ -752,16 +771,15 @@ it('should handle async operation', async () => {
 ```
 
 **Testing errors:**
+
 ```javascript
 it('should throw on invalid input', async () => {
-  await assert.rejects(
-    async () => await functionThatThrows(),
-    /Expected error message/
-  )
+  await assert.rejects(async () => await functionThatThrows(), /Expected error message/)
 })
 ```
 
 **Testing events:**
+
 ```javascript
 it('should emit event', (done) => {
   emitter.on('message', (data) => {
@@ -774,12 +792,11 @@ it('should emit event', (done) => {
 ```
 
 **Testing with timeouts:**
+
 ```javascript
 it('should complete within timeout', async () => {
   const promise = longRunningFunction()
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Timeout')), 1000)
-  )
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1000))
 
   await Promise.race([promise, timeout])
 })
@@ -807,11 +824,13 @@ open coverage/lcov-report/index.html
 ### Coverage Exceptions
 
 **Acceptable gaps:**
+
 - `src/index.js` - Integration test coverage only
 - Error handling branches for rare cases
 - Defensive null checks
 
 **Should be covered:**
+
 - All public APIs
 - Filter logic
 - Chunking algorithm
@@ -823,6 +842,7 @@ open coverage/lcov-report/index.html
 ### Pre-commit Hook
 
 **Install husky:**
+
 ```bash
 npm install --save-dev husky
 npx husky install
@@ -832,6 +852,7 @@ npx husky add .git/hooks/pre-commit "npm test && npm run lint"
 ### CI/CD Integration
 
 **GitHub Actions** (`.github/workflows/ci.yml`):
+
 ```yaml
 name: CI
 
@@ -880,6 +901,7 @@ npm test -- --watch --test-name-pattern="filter"
 ### Performance Testing
 
 **Benchmark critical paths:**
+
 ```javascript
 import { performance } from 'perf_hooks'
 
@@ -890,7 +912,7 @@ it('should filter 1000 messages in <100ms', () => {
 
   const start = performance.now()
 
-  messages.forEach(msg => filterMessage(msg, config))
+  messages.forEach((msg) => filterMessage(msg, config))
 
   const duration = performance.now() - start
 
@@ -901,11 +923,13 @@ it('should filter 1000 messages in <100ms', () => {
 ## Debugging Tests
 
 **Run with Node debugger:**
+
 ```bash
 node --inspect-brk node_modules/.bin/jest --runInBand
 ```
 
 **Add debug logs:**
+
 ```javascript
 it('should do something', () => {
   const result = functionUnderTest()
@@ -915,6 +939,7 @@ it('should do something', () => {
 ```
 
 **Isolate failing test:**
+
 ```javascript
 it.only('should focus on this test', () => {
   // Only this test runs

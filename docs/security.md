@@ -46,6 +46,7 @@ Comprehensive security practices for deploying and operating the Telegram replic
 ### Environment Variables
 
 **Storage:**
+
 ```bash
 # .env file (NEVER commit)
 API_ID=12345678
@@ -56,12 +57,14 @@ TG_2FA_PASSWORD=your_secure_password
 ```
 
 **File permissions:**
+
 ```bash
 chmod 600 .env
 chown telegram:telegram .env
 ```
 
 **Best practices:**
+
 - Use unique API credentials per deployment
 - Rotate credentials quarterly or after incidents
 - Never log or echo credentials
@@ -72,6 +75,7 @@ chown telegram:telegram .env
 **For production deployments, consider:**
 
 **1. HashiCorp Vault:**
+
 ```bash
 # Store secrets in Vault
 vault kv put secret/telegram-replicator \
@@ -85,6 +89,7 @@ export VAULT_TOKEN='...'
 ```
 
 **2. AWS Secrets Manager:**
+
 ```bash
 # Store secret
 aws secretsmanager create-secret \
@@ -98,6 +103,7 @@ aws secretsmanager get-secret-value \
 ```
 
 **3. Kubernetes Secrets:**
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -105,14 +111,15 @@ metadata:
   name: telegram-replicator-secrets
 type: Opaque
 stringData:
-  api_id: "12345678"
-  api_hash: "abcd..."
-  bot_token: "123:ABC..."
+  api_id: '12345678'
+  api_hash: 'abcd...'
+  bot_token: '123:ABC...'
 ```
 
 ### Credential Rotation
 
 **When to rotate:**
+
 - Every 90 days (scheduled)
 - After suspected compromise
 - After employee departure
@@ -142,17 +149,20 @@ stringData:
 ### Two-Factor Authentication (2FA)
 
 **Enable 2FA on Telegram:**
+
 1. Open Telegram app
 2. Settings → Privacy and Security → Two-Step Verification
 3. Set a strong password
 4. Add recovery email
 
 **Configure in replicator:**
+
 ```env
 TG_2FA_PASSWORD=your_2fa_password
 ```
 
 **Benefits:**
+
 - Blocks SIM swap attacks
 - Prevents SMS code interception exploitation
 - Requires password even with valid SMS code
@@ -160,11 +170,13 @@ TG_2FA_PASSWORD=your_2fa_password
 ### SIM Swap Protection
 
 **Risks:**
+
 - Attacker ports your phone number
 - Receives SMS codes for authentication
 - Generates new session without your knowledge
 
 **Mitigations:**
+
 1. **Enable 2FA** - Password required even with SMS code
 2. **Carrier PIN** - Add PIN to your mobile carrier account
 3. **Monitor sessions** - Check active sessions regularly in Telegram app
@@ -173,17 +185,20 @@ TG_2FA_PASSWORD=your_2fa_password
 ### Session Monitoring
 
 **Check active sessions:**
+
 1. Telegram app → Settings → Privacy and Security → Active Sessions
 2. Review location, device, IP address
 3. Terminate suspicious sessions immediately
 
 **Automated monitoring:**
+
 ```bash
 # Alert on new session file changes
 watch -n 300 'stat .telegram-session | grep Modify'
 ```
 
 **Log all session activities:**
+
 ```javascript
 // Add to listener.js
 client.on('session', (session) => {
@@ -196,11 +211,13 @@ client.on('session', (session) => {
 ### Channel Validation
 
 **Telegram verification indicators:**
+
 - **Verified badge** - Official channels (blue checkmark)
 - **Scam flag** - Telegram-flagged malicious channels
 - **Fake flag** - Impersonation attempts
 
 **Pre-deployment checks:**
+
 ```bash
 # Log channel metadata on startup
 logger.info({
@@ -213,6 +230,7 @@ logger.info({
 ```
 
 **Monitoring:**
+
 - Review startup logs for `scam` or `fake` flags
 - Periodically verify channel authenticity
 - Monitor for sudden changes in channel behavior
@@ -230,11 +248,12 @@ const suspiciousPatterns = [
 ]
 
 function isContentSuspicious(text) {
-  return suspiciousPatterns.some(pattern => pattern.test(text))
+  return suspiciousPatterns.some((pattern) => pattern.test(text))
 }
 ```
 
 **Considerations:**
+
 - Implement URL scanning (VirusTotal API)
 - Block known malicious domains
 - Rate-limit messages from new sources
@@ -245,12 +264,14 @@ function isContentSuspicious(text) {
 ### File Protection
 
 **Automatic enforcement (by app):**
+
 ```javascript
 // In listener.js
 fs.chmodSync('.telegram-session', 0o600)
 ```
 
 **Additional measures:**
+
 ```bash
 # Immutable flag (Linux)
 sudo chattr +i .telegram-session
@@ -280,6 +301,7 @@ rm .telegram-session  # Clean up after exit
 ```
 
 **Using encrypted volumes:**
+
 ```bash
 # Create encrypted volume
 cryptsetup luksFormat /dev/sdX
@@ -293,11 +315,13 @@ mount /dev/mapper/telegram-crypt /opt/telegram-replicator
 ### Session Lifecycle
 
 **Maximum session lifetime:**
+
 - **Active:** Renewed automatically on each connection
 - **Inactive:** ~30 days before expiration
 - **Password change:** Immediate invalidation
 
 **Force rotation policy:**
+
 ```bash
 # Rotate every 30 days
 0 0 1 * * rm /opt/telegram-replicator/.telegram-session
@@ -308,12 +332,14 @@ mount /dev/mapper/telegram-crypt /opt/telegram-replicator
 ### Bot Token Protection
 
 **Best practices:**
+
 - Use dedicated bot per deployment
 - Never share bot tokens between environments
 - Restrict bot to specific target channels only
 - Revoke token immediately if compromised
 
 **Bot permissions:**
+
 - Grant minimum required permissions
 - No admin privileges unless necessary
 - Regular permission audits
@@ -336,11 +362,13 @@ TELEGRAM_BOT_TOKEN=dev-bot-token
 ### Rate Limiting
 
 **Built-in protection:**
+
 - Exponential backoff on `FLOOD_WAIT`
 - Max 4 retries per target
 - 60-second delay cap
 
 **Additional measures:**
+
 - Monitor retry frequency
 - Alert on repeated rate limiting
 - Consider multiple bots for high-volume use cases
@@ -350,6 +378,7 @@ TELEGRAM_BOT_TOKEN=dev-bot-token
 ### System Hardening
 
 **Dedicated user:**
+
 ```bash
 # Create restricted user
 sudo useradd -r -s /bin/false telegram
@@ -357,6 +386,7 @@ sudo chmod 700 /opt/telegram-replicator
 ```
 
 **systemd security directives:**
+
 ```ini
 [Service]
 # Prevent privilege escalation
@@ -384,6 +414,7 @@ SystemCallErrorNumber=EPERM
 ### Network Security
 
 **Firewall rules:**
+
 ```bash
 # Allow outbound HTTPS only (Telegram API)
 sudo ufw default deny outgoing
@@ -392,10 +423,12 @@ sudo ufw enable
 ```
 
 **Telegram API endpoints:**
+
 - `api.telegram.org` (149.154.160.0/20)
 - Uses HTTPS (port 443)
 
 **Proxy support (optional):**
+
 ```javascript
 // Add to config for SOCKS5 proxy
 socksProxy: {
@@ -421,6 +454,7 @@ USER telegram
 ```
 
 **docker-compose security:**
+
 ```yaml
 services:
   telegram-replicator:
@@ -439,6 +473,7 @@ services:
 ### Security Logging
 
 **Log critical events:**
+
 ```javascript
 // Authentication
 logger.warn('Session authentication initiated')
@@ -453,6 +488,7 @@ logger.error({ sourceId }, 'Source channel access denied')
 ```
 
 **Centralized logging:**
+
 - Forward logs to SIEM (Splunk, ELK, Graylog)
 - Set up alerts for authentication failures
 - Monitor for unusual patterns
@@ -460,6 +496,7 @@ logger.error({ sourceId }, 'Source channel access denied')
 ### Security Metrics
 
 **Track:**
+
 - Authentication attempts (successful/failed)
 - Session regenerations
 - Rate limit hits
@@ -470,6 +507,7 @@ logger.error({ sourceId }, 'Source channel access denied')
 ### Audit Trail
 
 **Log all administrative actions:**
+
 ```bash
 # Session rotations
 logger.audit({ timestamp, user }, 'Session rotated')
@@ -486,6 +524,7 @@ logger.audit({ credential }, 'Credential rotated')
 ### Detection
 
 **Signs of compromise:**
+
 - Unexpected session file modifications
 - Unknown active sessions in Telegram app
 - Unauthorized messages from bot
@@ -497,6 +536,7 @@ logger.audit({ credential }, 'Credential rotated')
 **Immediate actions:**
 
 1. **Isolate:**
+
    ```bash
    # Stop service immediately
    systemctl stop telegram-replicator
@@ -506,6 +546,7 @@ logger.audit({ credential }, 'Credential rotated')
    ```
 
 2. **Invalidate credentials:**
+
    ```bash
    # Delete session
    rm .telegram-session
@@ -526,6 +567,7 @@ logger.audit({ credential }, 'Credential rotated')
    - Update `.env` with new values
 
 5. **Restore service:**
+
    ```bash
    # Re-authenticate with new session
    npm start
@@ -549,12 +591,14 @@ logger.audit({ credential }, 'Credential rotated')
 ### Data Protection
 
 **GDPR considerations:**
+
 - Messages may contain personal data
 - No persistent storage (in-memory only)
 - Data minimization (only text and media)
 - Right to be forgotten (delete session)
 
 **Data retention:**
+
 - Logs: 7-30 days (configurable)
 - Session: Active only, delete on termination
 - No message content storage
@@ -562,6 +606,7 @@ logger.audit({ credential }, 'Credential rotated')
 ### Audit Requirements
 
 **For regulated environments:**
+
 - Enable comprehensive logging (LOG_LEVEL=debug)
 - Forward logs to tamper-proof storage
 - Implement log integrity verification (signatures)
@@ -570,6 +615,7 @@ logger.audit({ credential }, 'Credential rotated')
 ## Security Checklist
 
 **Pre-deployment:**
+
 - [ ] Enable Telegram 2FA
 - [ ] Set carrier PIN for SIM protection
 - [ ] Generate unique API credentials
@@ -581,6 +627,7 @@ logger.audit({ credential }, 'Credential rotated')
 - [ ] Enable encrypted filesystem
 
 **Ongoing:**
+
 - [ ] Monitor active Telegram sessions weekly
 - [ ] Review logs for suspicious activity daily
 - [ ] Rotate credentials quarterly
@@ -589,6 +636,7 @@ logger.audit({ credential }, 'Credential rotated')
 - [ ] Audit bot permissions monthly
 
 **Post-incident:**
+
 - [ ] Rotate all credentials immediately
 - [ ] Review and update security controls
 - [ ] Document incident and lessons learned

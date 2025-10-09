@@ -27,10 +27,7 @@ const maybeTest = (name, fn) => {
     return test(name, fn)
   }
 
-  return test.skip(
-    `${name} (skipped: Set RUN_TELEGRAM_INTEGRATION=1 to run integration tests)`,
-    () => {}
-  )
+  return test.skip(`${name} (skipped: Set RUN_TELEGRAM_INTEGRATION=1 to run integration tests)`, () => {})
 }
 
 maybeTest('integration: sender sends real message via Telegraf', async () => {

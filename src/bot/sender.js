@@ -49,7 +49,10 @@ export async function createSender(
             if (!cachedFileId) {
               const result = await sendMedia(adapter, chatId, media, mediaType, caption)
               if (!result) {
-                logger.warn({ chatId: maskChatId(chatId), mediaType }, 'Media upload returned no file_id')
+                logger.warn(
+                  { chatId: maskChatId(chatId), mediaType },
+                  'Media upload returned no file_id'
+                )
               }
               cachedFileId = result
             } else {

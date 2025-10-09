@@ -240,7 +240,10 @@ export async function createListener(
 
     if (!lookupId) {
       if (msgChannelId !== undefined && msgChannelId !== null) {
-        log.debug({ msgChannelId, type: typeof msgChannelId }, 'Failed to convert channelId to BigInt')
+        log.debug(
+          { msgChannelId, type: typeof msgChannelId },
+          'Failed to convert channelId to BigInt'
+        )
       }
       return
     }

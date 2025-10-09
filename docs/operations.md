@@ -18,32 +18,37 @@ Production deployment and operational best practices for the Telegram replicator
 ### Option 1: PM2 (Recommended for Development)
 
 **Install PM2:**
+
 ```bash
 npm install -g pm2
 ```
 
 **Create ecosystem file** (`ecosystem.config.js`):
+
 ```javascript
 module.exports = {
-  apps: [{
-    name: 'telegram-replicator',
-    script: './src/index.js',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '500M',
-    env: {
-      NODE_ENV: 'production'
-    },
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    merge_logs: true
-  }]
+  apps: [
+    {
+      name: 'telegram-replicator',
+      script: './src/index.js',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production'
+      },
+      error_file: './logs/err.log',
+      out_file: './logs/out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true
+    }
+  ]
 }
 ```
 
 **Start with PM2:**
+
 ```bash
 # Start
 pm2 start ecosystem.config.js
@@ -68,6 +73,7 @@ pm2 save
 ### Option 2: systemd (Recommended for Production)
 
 **Create service file** (`/etc/systemd/system/telegram-replicator.service`):
+
 ```ini
 [Unit]
 Description=Telegram Message Replicator
@@ -100,6 +106,7 @@ WantedBy=multi-user.target
 ```
 
 **Setup and start:**
+
 ```bash
 # Create dedicated user
 sudo useradd -r -s /bin/false telegram
@@ -128,6 +135,7 @@ sudo journalctl -u telegram-replicator -f
 ### Option 3: Docker
 
 **Dockerfile:**
+
 ```dockerfile
 FROM node:18-alpine
 
@@ -155,6 +163,7 @@ CMD ["node", "src/index.js"]
 ```
 
 **docker-compose.yml:**
+
 ```yaml
 version: '3.8'
 
@@ -169,15 +178,16 @@ services:
       - ./logs:/app/logs
       - ./.telegram-session:/app/.telegram-session:ro
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 ```
 
 **Important:** Docker requires pre-generated `.telegram-session` file (run locally first for SMS code).
 
 **Run with Docker:**
+
 ```bash
 # Build
 docker-compose build
@@ -197,6 +207,7 @@ docker-compose down
 ### Initial Authentication
 
 **Interactive setup:**
+
 ```bash
 # Run locally to generate session
 npm start
@@ -207,6 +218,7 @@ npm start
 ```
 
 **Non-interactive (for automation):**
+
 ```bash
 # Set 2FA password in .env
 TG_2FA_PASSWORD=your_password
@@ -218,6 +230,7 @@ TG_2FA_PASSWORD=your_password
 ### Session Security
 
 **File permissions:**
+
 ```bash
 # Automatically enforced by app
 chmod 600 .telegram-session
@@ -225,11 +238,13 @@ chmod 600 .env
 ```
 
 **Session lifecycle:**
+
 - Valid for ~30 days of inactivity
 - Renewed automatically on each connection
 - Expires immediately on password change
 
 **Session rotation:**
+
 ```bash
 # Delete expired session
 rm .telegram-session
@@ -249,11 +264,13 @@ npm start
 ### Health Monitoring
 
 **Built-in health check:**
+
 - 30-second interval connection check
 - Logs connection state changes
 - Exits on disconnect (process manager restarts)
 
 **Exit behavior:**
+
 ```javascript
 // Automatic exit on:
 - GramJS disconnection
@@ -264,6 +281,7 @@ npm start
 ### Graceful Shutdown
 
 **Manual shutdown:**
+
 ```bash
 # Sends SIGTERM, waits for cleanup
 kill -TERM <pid>
@@ -273,6 +291,7 @@ pm2 stop telegram-replicator
 ```
 
 **Shutdown sequence:**
+
 1. Stop accepting new messages
 2. Complete pending sends
 3. Close connections
@@ -283,6 +302,7 @@ pm2 stop telegram-replicator
 ### Statistics Logging
 
 **Automatic stats (every 5 minutes):**
+
 ```json
 {
   "messagesProcessed": 147,
@@ -319,6 +339,7 @@ grep "Message dropped" logs/output.log
 ### Metrics to Track
 
 **Operational metrics:**
+
 - Uptime percentage
 - Message processing rate (msgs/min)
 - Filter drop rate (%)
@@ -327,6 +348,7 @@ grep "Message dropped" logs/output.log
 - Average message latency
 
 **System metrics:**
+
 - CPU usage
 - Memory usage
 - Network I/O
@@ -335,11 +357,13 @@ grep "Message dropped" logs/output.log
 ### Alerting Recommendations
 
 **Critical alerts:**
+
 - Process down for >5 minutes
 - Authentication failures
 - Zero messages processed for >1 hour (if expecting traffic)
 
 **Warning alerts:**
+
 - High error rate (>5% of sends)
 - Frequent rate limiting (>10 FLOOD_WAIT/hour)
 - Memory usage >400MB
@@ -361,6 +385,7 @@ createServer((req, res) => {
 ```
 
 **Monitor with:**
+
 - UptimeRobot
 - Pingdom
 - DataDog
@@ -371,12 +396,14 @@ createServer((req, res) => {
 ### Log Configuration
 
 **Environment variables:**
+
 ```env
 LOG_LEVEL=info          # debug|info|warn|error
 NODE_ENV=production     # development|production|test
 ```
 
 **Log levels:**
+
 - `debug` - All events including message content (verbose)
 - `info` - Normal operations, stats, connection events
 - `warn` - Recoverable errors, rate limits, retries
@@ -385,12 +412,14 @@ NODE_ENV=production     # development|production|test
 ### Log Format
 
 **Development (pretty-printed):**
+
 ```
 [2025-10-09 10:23:45] INFO (listener.js:142): Connected to Telegram
 [2025-10-09 10:23:47] INFO (index.js:56): Message processed (id=12345)
 ```
 
 **Production (JSON):**
+
 ```json
 {
   "level": 30,
@@ -406,6 +435,7 @@ NODE_ENV=production     # development|production|test
 **Using logrotate:**
 
 Create `/etc/logrotate.d/telegram-replicator`:
+
 ```
 /var/log/telegram-replicator/*.log {
     daily
@@ -423,6 +453,7 @@ Create `/etc/logrotate.d/telegram-replicator`:
 ```
 
 **Using PM2:**
+
 ```bash
 pm2 install pm2-logrotate
 pm2 set pm2-logrotate:max_size 10M
@@ -432,12 +463,14 @@ pm2 set pm2-logrotate:retain 7
 ### Sensitive Data Redaction
 
 **Automatically redacted:**
+
 - Bot tokens
 - API hashes
 - Phone numbers
 - Authorization headers
 
 **Manual redaction (if logging full messages):**
+
 ```javascript
 // Don't log message content in production
 logger.info({ messageId: msg.id }, 'Message processed')
@@ -450,17 +483,20 @@ logger.info({ messageId: msg.id }, 'Message processed')
 ### What to Backup
 
 **Critical files:**
+
 - `.env` - Configuration and credentials
 - `.telegram-session` - Authenticated session
 - `ecosystem.config.js` or systemd service file
 
 **Optional:**
+
 - Logs (for audit trail)
 - Application code (if customized)
 
 ### Backup Strategy
 
 **Manual backup:**
+
 ```bash
 # Create encrypted backup
 tar -czf backup-$(date +%Y%m%d).tar.gz .env .telegram-session
@@ -474,6 +510,7 @@ gpg -d backup-*.tar.gz.gpg | tar -tzf -
 **Automated backup (systemd timer):**
 
 Create `/etc/systemd/system/telegram-replicator-backup.service`:
+
 ```ini
 [Unit]
 Description=Backup Telegram Replicator Session
@@ -485,6 +522,7 @@ ExecStart=/usr/local/bin/backup-telegram-session.sh
 ```
 
 Create `/etc/systemd/system/telegram-replicator-backup.timer`:
+
 ```ini
 [Unit]
 Description=Daily Telegram Replicator Backup
@@ -500,6 +538,7 @@ WantedBy=timers.target
 ### Recovery Procedure
 
 **Restore from backup:**
+
 ```bash
 # Decrypt backup
 gpg -d backup-20251009.tar.gz.gpg > backup.tar.gz
@@ -519,6 +558,7 @@ systemctl restart telegram-replicator
 **Session invalidation:**
 
 If session is compromised:
+
 1. Delete `.telegram-session`
 2. Terminate sessions via Telegram app (Settings → Privacy → Active Sessions)
 3. Re-authenticate
@@ -529,11 +569,13 @@ If session is compromised:
 ### Resource Limits
 
 **Typical resource usage:**
+
 - CPU: <5% (idle), 10-20% (active)
 - Memory: 100-200MB
 - Network: Depends on message volume and media
 
 **Adjust limits (systemd):**
+
 ```ini
 [Service]
 MemoryMax=500M
@@ -541,6 +583,7 @@ CPUQuota=50%
 ```
 
 **Adjust limits (PM2):**
+
 ```javascript
 {
   max_memory_restart: '500M',
@@ -552,16 +595,19 @@ CPUQuota=50%
 ### Optimization Tips
 
 **High-volume channels:**
+
 - Increase `MAX_MEDIA_BYTES` only if needed
 - Use stricter `FILTER_REGEX` to reduce load
 - Monitor rate limiting frequency
 
 **Low-latency requirements:**
+
 - Set `LOG_LEVEL=warn` (reduce I/O)
 - Disable pretty logging in production
 - Use SSD for session file writes
 
 **Multiple sources:**
+
 - Consider separate instances if >10 sources
 - Monitor memory usage with many sources
 
@@ -570,6 +616,7 @@ CPUQuota=50%
 ### Common Issues
 
 **Process exits immediately:**
+
 ```bash
 # Check logs for startup errors
 journalctl -u telegram-replicator -n 50
@@ -581,6 +628,7 @@ journalctl -u telegram-replicator -n 50
 ```
 
 **High CPU usage:**
+
 ```bash
 # Check message volume
 grep "Message processed" logs/output.log | wc -l
@@ -590,6 +638,7 @@ node --prof src/index.js
 ```
 
 **Memory leaks:**
+
 ```bash
 # Monitor memory over time
 watch -n 5 'ps aux | grep index.js'
@@ -599,6 +648,7 @@ node --inspect src/index.js
 ```
 
 **Rate limiting loops:**
+
 ```bash
 # Check FLOOD_WAIT frequency
 grep "FLOOD_WAIT" logs/output.log | tail -20
@@ -609,11 +659,13 @@ grep "FLOOD_WAIT" logs/output.log | tail -20
 ### Debug Mode
 
 **Enable verbose logging:**
+
 ```bash
 LOG_LEVEL=debug npm start
 ```
 
 **Trace specific messages:**
+
 ```javascript
 // Temporarily add to index.js
 logger.debug({ msg }, 'Raw message received')
