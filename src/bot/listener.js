@@ -269,17 +269,23 @@ export async function createListener(
   })
 
   // Additional connection state monitoring
-  const connectionState = client._connection?.state
-  if (connectionState !== undefined) {
-    const checkConnection = setInterval(() => {
-      if (!client.connected) {
-        log.error('Connection check failed - client not connected, exiting')
-        clearInterval(checkConnection)
-        proc.exit?.(1)
-      }
-    }, CONNECTION_CHECK_INTERVAL_MS)
+  // NOTE: Accessing client._connection is a private API, may break in future GramJS versions
+  // Wrapped in try-catch for graceful degradation
+  try {
+    const connectionState = client._connection?.state
+    if (connectionState !== undefined) {
+      const checkConnection = setInterval(() => {
+        if (!client.connected) {
+          log.error('Connection check failed - client not connected, exiting')
+          clearInterval(checkConnection)
+          proc.exit?.(1)
+        }
+      }, CONNECTION_CHECK_INTERVAL_MS)
 
-    emitter.once('stop', () => clearInterval(checkConnection))
+      emitter.once('stop', () => clearInterval(checkConnection))
+    }
+  } catch (err) {
+    log.warn({ err }, 'Failed to setup connection monitoring (private API unavailable)')
   }
 
   log.info({ sourceCount: channelMap.size }, 'Listener ready')
