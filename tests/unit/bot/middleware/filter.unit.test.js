@@ -4,7 +4,7 @@ import { filterMessage } from '../../../../src/bot/middleware/filter.js'
 
 const mockConfig = {
   filterRegex: /tech|update/i,
-  stripRegex: /Powered by.*$/gi,
+  stripRegex: /(?:^|\n)(Powered by.*|Discover more at .*)$/gi,
   maxMediaBytes: 10 * 1024 * 1024,
   supportedMediaTypes: ['photo', 'document', 'video', 'audio']
 }
@@ -32,6 +32,13 @@ test('filterMessage filters and transforms matching message', () => {
 
 test('filterMessage strips footer patterns from text', () => {
   const msg = { id: 4, message: 'Tech news\nPowered by Example.com' }
+  const result = filterMessage(msg, mockConfig)
+  assert.ok(result)
+  assert.strictEqual(result.text, 'Tech news')
+})
+
+test('filterMessage strips discover more promotional footers', () => {
+  const msg = { id: 20, message: 'Tech news\nDiscover more at hackrisk.io' }
   const result = filterMessage(msg, mockConfig)
   assert.ok(result)
   assert.strictEqual(result.text, 'Tech news')
