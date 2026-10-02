@@ -1,11 +1,15 @@
 import { Telegraf } from 'telegraf'
-import { logger, maskChatId } from '../config.js'
+import { logger, maskChatId, config } from '../config.js'
 import { retryWithBackoff } from '../utils/retry.js'
 import { createTelegrafAdapter } from './telegraf-adapter.js'
 
 const CAPTION_LIMIT = 1024
 const MESSAGE_LIMIT = 4096
 const DEFAULT_FLOOD_WAIT_SECONDS = 30
+
+const REPO_URL = config.githubRepoUrl
+const DM_COOLDOWN_MS = config.dmCooldownSeconds * 1000
+const userCooldowns = new Map()
 
 // Media type adapters with Telegram API method configuration
 const MEDIA_ADAPTERS = {
@@ -52,6 +56,47 @@ export async function createSender(
 
   const info = await adapter.getMe()
   logger.info({ username: info.username }, 'Sender bot ready')
+
+  if (REPO_URL) {
+    bot.on('message', (ctx) => {
+      if (ctx.chat.type !== 'private') return
+
+      const userId = ctx.from.id
+      const now = Date.now()
+      const lastResponse = userCooldowns.get(userId)
+
+      if (lastResponse && now - lastResponse < DM_COOLDOWN_MS) {
+        logger.debug({ userId }, 'DM ignored (cooldown)')
+        return
+      }
+
+      userCooldowns.set(userId, now)
+      logger.info({ userId }, 'Responding to DM')
+
+      ctx
+        .reply(
+          `<b>🛡 LeakWatch ES - Automated Relay</b>\n\n` +
+            `<i>NOTICE: This bot is a non-interactive instance of an open-source, event-driven message replicator. ` +
+            `It is not configured to process inbound messages.</i>\n\n` +
+            `<b>System Profile:</b>\n` +
+            `• Status: Active [🟢] <code>444 (r--r--r--)</code>\n` +
+            `• Powered by: <a href="${REPO_URL}">telegram-replicator</a>\n` +
+            `• Developer: 👤 @hxreb0rn\n\n` +
+            `<b>📂 Self-Hosting &amp; Source</b>\n` +
+            `This project is fully open-source. You can find the source code and deployment guides to host your own instance on <a href="${REPO_URL}">GitHub</a>.`,
+          { parse_mode: 'HTML', disable_web_page_preview: true }
+        )
+        .catch((err) => logger.error({ err, userId }, 'Failed to respond to DM'))
+
+      const cleanupThreshold = now - DM_COOLDOWN_MS * 2
+      for (const [id, timestamp] of userCooldowns) {
+        if (timestamp < cleanupThreshold) userCooldowns.delete(id)
+      }
+    })
+
+    bot.launch()
+    logger.info('DM responder active')
+  }
 
   return {
     /**
@@ -135,6 +180,9 @@ export async function createSender(
 
     stop: (signal) => {
       logger.info({ signal }, 'Stopping sender bot')
+      if (REPO_URL) {
+        bot.stop(signal)
+      }
     }
   }
 }

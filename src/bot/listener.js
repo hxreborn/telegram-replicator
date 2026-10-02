@@ -9,6 +9,8 @@ import { logger as baseLogger } from '../config.js'
 const SESSION_FILE = '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
+const POLL_INTERVAL_MS = 30000
+const POLL_MESSAGE_LIMIT = 5
 
 // File permission constants for session security
 const INSECURE_PERMISSION_MASK = 0o077 // Mask for detecting world/group permissions
@@ -140,7 +142,6 @@ export async function createListener(
     log.debug('Session restored from file')
   }
 
-  // Get dialogs to ensure connection is ready
   await client.getDialogs({ limit: 1 })
 
   const channelMap = new Map()
@@ -206,7 +207,8 @@ export async function createListener(
       channelMap.set(channelId, {
         id: channelId,
         input,
-        label
+        label,
+        entity
       })
     } catch (err) {
       const startsWithAt = typeof input === 'string' && input.startsWith('@')
@@ -219,6 +221,15 @@ export async function createListener(
           `  → ${hint}\n` +
           `  → Original error: ${err.message}`
       )
+    }
+  }
+
+  for (const [, source] of channelMap) {
+    try {
+      await client.getMessages(source.entity, { limit: 1 })
+      log.debug({ source: source.label }, 'Primed update subscription for source')
+    } catch (err) {
+      log.warn({ source: source.label, err }, 'Failed to prime source subscription')
     }
   }
 
@@ -268,6 +279,54 @@ export async function createListener(
     )
     emitter.emit('message', { message: msg, source: sourceInfo })
   }, new eventClass({}))
+
+  const pollLastSeen = new Map()
+
+  for (const [channelId, source] of channelMap) {
+    try {
+      const msgs = await client.getMessages(source.entity, { limit: 1 })
+      if (msgs.length > 0) {
+        pollLastSeen.set(channelId, msgs[0].id)
+        log.debug({ source: source.label, lastId: msgs[0].id }, 'Poll baseline set')
+      }
+    } catch (err) {
+      log.warn({ source: source.label, err }, 'Failed to set poll baseline')
+    }
+  }
+
+  const pollInterval = setInterval(async () => {
+    for (const [channelId, source] of channelMap) {
+      try {
+        const msgs = await client.getMessages(source.entity, { limit: POLL_MESSAGE_LIMIT })
+        const lastSeen = pollLastSeen.get(channelId) ?? 0
+
+        const newMsgs = msgs.filter((m) => m.id > lastSeen).reverse()
+
+        if (newMsgs.length > 0) {
+          pollLastSeen.set(channelId, Math.max(...newMsgs.map((m) => m.id)))
+          log.info({ source: source.label, count: newMsgs.length }, 'Poll found new messages')
+        }
+
+        for (const msg of newMsgs) {
+          log.debug(
+            {
+              msgId: msg.id,
+              hasMedia: !!msg.media,
+              text: (msg.message || msg.caption || '').slice(0, 50),
+              source: source.label,
+              via: 'poll'
+            },
+            'Message received from source'
+          )
+          emitter.emit('message', { message: msg, source })
+        }
+      } catch (err) {
+        log.warn({ source: source.label, err }, 'Poll cycle failed')
+      }
+    }
+  }, POLL_INTERVAL_MS)
+
+  emitter.once('stop', () => clearInterval(pollInterval))
 
   // Handle connection state changes - exit on disconnect to let PM2 restart
   client.on('disconnected', () => {

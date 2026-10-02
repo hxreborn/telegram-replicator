@@ -148,7 +148,8 @@ export const config = Object.freeze({
 
   // Optional configuration (compiled regex)
   filterRegex: compileRegex(
-    process.env.FILTER_REGEX || 'tech|technology|announcement|news|update',
+    process.env.FILTER_REGEX ||
+      'tech|technology|announcement|news|update|cyber|alert|breach|threat',
     'i',
     'FILTER_REGEX'
   ),
@@ -159,7 +160,10 @@ export const config = Object.freeze({
   ),
   maxMediaBytes: validateMaxMediaBytes(process.env.MAX_MEDIA_BYTES),
   supportedMediaTypes: getSupportedMediaTypes(process.env.SUPPORTED_MEDIA_TYPES),
-  logLevel: isTest ? 'silent' : process.env.LOG_LEVEL || 'info'
+  logLevel: isTest ? 'silent' : process.env.LOG_LEVEL || 'info',
+
+  githubRepoUrl: process.env.GITHUB_REPO_URL || '',
+  dmCooldownSeconds: Number(process.env.DM_COOLDOWN_SECONDS) || 300
 })
 
 /**
