@@ -90,6 +90,18 @@ All configuration via `.env` file:
 - Your user account must be a member of source channels
 - Test regex patterns at [regex101.com](https://regex101.com) (JavaScript flavor)
 
+## Multiple Replicators
+
+Each `instances/<name>.env` becomes its own pm2 app, `telegram-replicator-<name>`, with its own sources, targets, filters and session file (`instances/<name>.session`). Start from `instances/example.env.sample`.
+
+Each instance logs in separately, so create its session once interactively:
+
+```bash
+DOTENV_CONFIG_PATH=instances/<name>.env SESSION_FILE=instances/<name>.session npm start
+```
+
+Then `pm2 startOrReload ecosystem.config.cjs`. Instances sharing a bot token conflict if `GITHUB_REPO_URL` (the DM responder) is set in more than one.
+
 ## Scripts & Testing
 
 ```bash

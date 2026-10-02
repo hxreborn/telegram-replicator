@@ -6,7 +6,7 @@ import { StringSession } from 'telegram/sessions/index.js'
 import { NewMessage } from 'telegram/events/index.js'
 import { logger as baseLogger } from '../config.js'
 
-const SESSION_FILE = '.telegram-session'
+const SESSION_FILE = process.env.SESSION_FILE || '.telegram-session'
 const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 const POLL_INTERVAL_MS = 30000

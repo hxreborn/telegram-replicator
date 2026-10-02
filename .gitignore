@@ -227,3 +227,7 @@ download-ripgrepja3o7f/
 !CLAUDE.md
 !docs/*.md
 logs/
+
+# Per-instance env and session files
+instances/*
+!instances/example.env.sample
