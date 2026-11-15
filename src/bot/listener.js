@@ -11,6 +11,7 @@ const CONNECTION_RETRIES = 5
 const CONNECTION_CHECK_INTERVAL_MS = 30000
 const POLL_INTERVAL_MS = 30000
 const POLL_MESSAGE_LIMIT = 5
+const POLL_STALL_TIMEOUT_MS = 120000
 
 // File permission constants for session security
 const INSECURE_PERMISSION_MASK = 0o077 // Mask for detecting world/group permissions
@@ -294,35 +295,50 @@ export async function createListener(
     }
   }
 
+  let pollInProgress = false
+  let lastSuccessfulPoll = Date.now()
+  let pollingConfirmed = false
+
   const pollInterval = setInterval(async () => {
-    for (const [channelId, source] of channelMap) {
-      try {
-        const msgs = await client.getMessages(source.entity, { limit: POLL_MESSAGE_LIMIT })
-        const lastSeen = pollLastSeen.get(channelId) ?? 0
+    if (pollInProgress) return
+    pollInProgress = true
+    try {
+      for (const [channelId, source] of channelMap) {
+        try {
+          const msgs = await client.getMessages(source.entity, { limit: POLL_MESSAGE_LIMIT })
+          lastSuccessfulPoll = Date.now()
+          if (!pollingConfirmed) {
+            log.info({ source: source.label }, 'Source polling healthy')
+            pollingConfirmed = true
+          }
+          const lastSeen = pollLastSeen.get(channelId) ?? 0
 
-        const newMsgs = msgs.filter((m) => m.id > lastSeen).reverse()
+          const newMsgs = msgs.filter((m) => m.id > lastSeen).reverse()
 
-        if (newMsgs.length > 0) {
-          pollLastSeen.set(channelId, Math.max(...newMsgs.map((m) => m.id)))
-          log.info({ source: source.label, count: newMsgs.length }, 'Poll found new messages')
+          if (newMsgs.length > 0) {
+            pollLastSeen.set(channelId, Math.max(...newMsgs.map((m) => m.id)))
+            log.info({ source: source.label, count: newMsgs.length }, 'Poll found new messages')
+          }
+
+          for (const msg of newMsgs) {
+            log.debug(
+              {
+                msgId: msg.id,
+                hasMedia: !!msg.media,
+                text: (msg.message || msg.caption || '').slice(0, 50),
+                source: source.label,
+                via: 'poll'
+              },
+              'Message received from source'
+            )
+            emitter.emit('message', { message: msg, source })
+          }
+        } catch (err) {
+          log.warn({ source: source.label, err }, 'Poll cycle failed')
         }
-
-        for (const msg of newMsgs) {
-          log.debug(
-            {
-              msgId: msg.id,
-              hasMedia: !!msg.media,
-              text: (msg.message || msg.caption || '').slice(0, 50),
-              source: source.label,
-              via: 'poll'
-            },
-            'Message received from source'
-          )
-          emitter.emit('message', { message: msg, source })
-        }
-      } catch (err) {
-        log.warn({ source: source.label, err }, 'Poll cycle failed')
       }
+    } finally {
+      pollInProgress = false
     }
   }, POLL_INTERVAL_MS)
 
@@ -334,25 +350,19 @@ export async function createListener(
     proc.exit?.(1)
   })
 
-  // Additional connection state monitoring
-  // NOTE: Accessing client._connection is a private API, may break in future GramJS versions
-  // Wrapped in try-catch for graceful degradation
-  try {
-    const connectionState = client._connection?.state
-    if (connectionState !== undefined) {
-      const checkConnection = setInterval(() => {
-        if (!client.connected) {
-          log.error('Connection check failed - client not connected, exiting')
-          clearInterval(checkConnection)
-          proc.exit?.(1)
-        }
-      }, CONNECTION_CHECK_INTERVAL_MS)
-
-      emitter.once('stop', () => clearInterval(checkConnection))
+  const checkConnection = setInterval(() => {
+    if (!client.connected) {
+      log.error('Connection check failed - client not connected, exiting')
+    } else if (Date.now() - lastSuccessfulPoll >= POLL_STALL_TIMEOUT_MS) {
+      log.error('Source polling stalled, exiting for clean restart')
+    } else {
+      return
     }
-  } catch (err) {
-    log.warn({ err }, 'Failed to setup connection monitoring (private API unavailable)')
-  }
+    clearInterval(checkConnection)
+    proc.exit?.(1)
+  }, CONNECTION_CHECK_INTERVAL_MS)
+
+  emitter.once('stop', () => clearInterval(checkConnection))
 
   log.info({ sourceCount: channelMap.size }, 'Listener ready')
 

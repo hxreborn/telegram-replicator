@@ -1,4 +1,4 @@
-import { test } from '@jest/globals'
+import { jest, test } from '@jest/globals'
 import assert from 'node:assert/strict'
 
 import { createListener } from '../../../src/bot/listener.js'
@@ -152,4 +152,77 @@ test('createListener emits events and surfaces channel trust metadata', async ()
   await listener.stop()
   assert.ok(disconnectCalled, 'disconnects GramJS client on stop')
   assert.deepEqual(processStub.exitCodes, [], 'does not exit process during normal operations')
+})
+
+async function createMonitoredListener(getMessages = async () => []) {
+  const client = {
+    connected: true,
+    connect: async () => {},
+    getDialogs: async () => {},
+    getEntity: async () => ({ id: 1, title: 'Source' }),
+    getMessages,
+    addEventHandler: () => {},
+    on: () => {},
+    disconnect: async () => {}
+  }
+  const exit = jest.fn()
+  const listener = await createListener(
+    { apiId: 123, apiHash: 'hash', sources: ['source'] },
+    {
+      clientFactory: () => client,
+      fs: {
+        existsSync: () => true,
+        statSync: () => ({ mode: 0o600 }),
+        readFileSync: () => 'session'
+      },
+      logger: createLoggerDouble().logger,
+      process: { exit }
+    }
+  )
+  return { client, listener, exit }
+}
+
+test('connection monitor exits without private GramJS connection state', async () => {
+  jest.useFakeTimers()
+  const { client, listener, exit } = await createMonitoredListener()
+  try {
+    client.connected = false
+    await jest.advanceTimersByTimeAsync(30000)
+    assert.equal(exit.mock.calls.length, 1)
+    assert.equal(exit.mock.calls[0][0], 1)
+  } finally {
+    await listener.stop()
+    jest.useRealTimers()
+  }
+})
+
+test('stalled polling exits without accumulating pending requests', async () => {
+  jest.useFakeTimers()
+  const getMessages = jest.fn().mockResolvedValue([])
+  const { listener, exit } = await createMonitoredListener(getMessages)
+  getMessages.mockImplementation(() => new Promise(() => {}))
+  try {
+    await jest.advanceTimersByTimeAsync(120000)
+    assert.equal(exit.mock.calls.length, 1)
+    assert.equal(exit.mock.calls[0][0], 1)
+    assert.equal(getMessages.mock.calls.length, 3)
+  } finally {
+    await listener.stop()
+    jest.useRealTimers()
+  }
+})
+
+test('successful empty polls keep an idle source healthy and stop clears monitoring', async () => {
+  jest.useFakeTimers()
+  const { client, listener, exit } = await createMonitoredListener()
+  try {
+    await jest.advanceTimersByTimeAsync(300000)
+    assert.equal(exit.mock.calls.length, 0)
+    await listener.stop()
+    client.connected = false
+    await jest.advanceTimersByTimeAsync(120000)
+    assert.equal(exit.mock.calls.length, 0)
+  } finally {
+    jest.useRealTimers()
+  }
 })
