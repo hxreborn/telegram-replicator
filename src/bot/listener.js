@@ -8,10 +8,10 @@ import { logger as baseLogger } from '../config.js'
 
 const SESSION_FILE = process.env.SESSION_FILE || '.telegram-session'
 const CONNECTION_RETRIES = 5
-const CONNECTION_CHECK_INTERVAL_MS = 30000
-const POLL_INTERVAL_MS = 30000
+const CONNECTION_CHECK_INTERVAL_MS = 300000
+const POLL_INTERVAL_MS = 300000
 const POLL_MESSAGE_LIMIT = 5
-const POLL_STALL_TIMEOUT_MS = 120000
+const POLL_STALL_TIMEOUT_MS = 600000
 
 // File permission constants for session security
 const INSECURE_PERMISSION_MASK = 0o077 // Mask for detecting world/group permissions
