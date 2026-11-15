@@ -295,22 +295,22 @@ export async function createListener(
     }
   }
 
+  if (pollLastSeen.size === channelMap.size) {
+    log.info({ sourceCount: channelMap.size }, 'Source polling healthy')
+  }
+
   let pollInProgress = false
   let lastSuccessfulPoll = Date.now()
-  let pollingConfirmed = false
 
   const pollInterval = setInterval(async () => {
     if (pollInProgress) return
     pollInProgress = true
+    let allSourcesPolled = true
     try {
       for (const [channelId, source] of channelMap) {
         try {
           const msgs = await client.getMessages(source.entity, { limit: POLL_MESSAGE_LIMIT })
           lastSuccessfulPoll = Date.now()
-          if (!pollingConfirmed) {
-            log.info({ source: source.label }, 'Source polling healthy')
-            pollingConfirmed = true
-          }
           const lastSeen = pollLastSeen.get(channelId) ?? 0
 
           const newMsgs = msgs.filter((m) => m.id > lastSeen).reverse()
@@ -334,8 +334,12 @@ export async function createListener(
             emitter.emit('message', { message: msg, source })
           }
         } catch (err) {
+          allSourcesPolled = false
           log.warn({ source: source.label, err }, 'Poll cycle failed')
         }
+      }
+      if (allSourcesPolled) {
+        log.info({ sourceCount: channelMap.size }, 'Source polling healthy')
       }
     } finally {
       pollInProgress = false

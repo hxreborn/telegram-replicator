@@ -166,6 +166,7 @@ async function createMonitoredListener(getMessages = async () => []) {
     disconnect: async () => {}
   }
   const exit = jest.fn()
+  const loggerDouble = createLoggerDouble()
   const listener = await createListener(
     { apiId: 123, apiHash: 'hash', sources: ['source'] },
     {
@@ -175,11 +176,11 @@ async function createMonitoredListener(getMessages = async () => []) {
         statSync: () => ({ mode: 0o600 }),
         readFileSync: () => 'session'
       },
-      logger: createLoggerDouble().logger,
+      logger: loggerDouble.logger,
       process: { exit }
     }
   )
-  return { client, listener, exit }
+  return { client, listener, exit, entries: loggerDouble.entries }
 }
 
 test('connection monitor exits without private GramJS connection state', async () => {
@@ -225,6 +226,34 @@ test('successful empty polls keep an idle source healthy and stop clears monitor
     await jest.advanceTimersByTimeAsync(600000)
     assert.equal(exit.mock.calls.length, 0)
   } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('health logging records successful reads even when the channel is quiet', async () => {
+  jest.useFakeTimers()
+  const { listener, entries } = await createMonitoredListener()
+  try {
+    await jest.advanceTimersByTimeAsync(600000)
+    const healthy = entries.filter((entry) => entry.args[1] === 'Source polling healthy')
+    assert.equal(healthy.length, 2)
+    assert.equal(healthy[0].args[0].sourceCount, 1)
+  } finally {
+    await listener.stop()
+    jest.useRealTimers()
+  }
+})
+
+test('failed source reads do not log a healthy polling cycle', async () => {
+  jest.useFakeTimers()
+  const getMessages = jest.fn().mockResolvedValue([])
+  const { listener, entries } = await createMonitoredListener(getMessages)
+  getMessages.mockRejectedValue(new Error('TIMEOUT'))
+  try {
+    await jest.advanceTimersByTimeAsync(300000)
+    assert.equal(entries.filter((entry) => entry.args[1] === 'Source polling healthy').length, 0)
+  } finally {
+    await listener.stop()
     jest.useRealTimers()
   }
 })
